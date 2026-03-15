@@ -9,11 +9,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MealSummaryModal } from '@/components/meal-summary-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/store/app-store';
+
+const TOP_INSET_EXTRA = 12;
 
 export default function LogMealScreen() {
   const {
@@ -30,6 +35,10 @@ export default function LogMealScreen() {
     clearLastSavedMeal,
     resetChatSession,
   } = useAppStore();
+
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
 
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<ScrollView>(null);
@@ -78,8 +87,11 @@ export default function LogMealScreen() {
         {/* Chat history */}
         <ScrollView
           ref={scrollRef}
-          style={styles.flex}
-          contentContainerStyle={styles.messageList}
+          style={[styles.flex, { backgroundColor: theme.background }]}
+          contentContainerStyle={[
+            styles.messageList,
+            { paddingTop: insets.top + TOP_INSET_EXTRA },
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           {chatMessages.length === 0 ? (
@@ -97,47 +109,73 @@ export default function LogMealScreen() {
                 key={msg.id}
                 style={[
                   styles.bubble,
-                  msg.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant,
+                  msg.role === 'user'
+                    ? [styles.bubbleUser, { backgroundColor: theme.accent }]
+                    : [styles.bubbleAssistant, { backgroundColor: theme.surface }],
                 ]}
               >
-                <ThemedText style={msg.role === 'user' ? styles.bubbleTextUser : undefined}>
+                <ThemedText
+                  style={
+                    msg.role === 'user'
+                      ? [styles.bubbleTextUser, { color: theme.background }]
+                      : undefined
+                  }
+                >
                   {msg.text}
                 </ThemedText>
               </View>
             ))
           )}
 
-          {/* Option chips inline after last assistant message */}
           {clarificationOptions.length > 0 && !isInterpreting && (
             <View style={styles.chipsContainer}>
               {clarificationOptions.map((option) => (
                 <Pressable
                   key={option}
-                  style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    { borderColor: theme.accent, backgroundColor: theme.surface },
+                    pressed && { backgroundColor: theme.accent },
+                  ]}
                   onPress={() => onSelectOption(option)}
                 >
-                  <ThemedText style={styles.chipText}>{option}</ThemedText>
+                  {({ pressed }) => (
+                    <ThemedText
+                      style={[
+                        styles.chipText,
+                        { color: pressed ? theme.background : theme.accent },
+                      ]}
+                    >
+                      {option}
+                    </ThemedText>
+                  )}
                 </Pressable>
               ))}
             </View>
           )}
 
           {isInterpreting && (
-            <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
-              <ActivityIndicator size="small" />
+            <View
+              style={[
+                styles.bubble,
+                styles.bubbleAssistant,
+                styles.typingBubble,
+                { backgroundColor: theme.surface },
+              ]}
+            >
+              <ActivityIndicator size="small" color={theme.accent} />
             </View>
           )}
 
           {!!chatError && (
-            <ThemedView style={styles.errorBanner}>
+            <ThemedView style={[styles.errorBanner, { backgroundColor: '#FEF2F2' }]}>
               <ThemedText style={styles.errorText}>{chatError}</ThemedText>
             </ThemedView>
           )}
         </ScrollView>
 
-        {/* Save / Reset actions when estimate is ready */}
         {isReadyToSave && (
-          <ThemedView style={styles.actionBar}>
+          <ThemedView style={[styles.actionBar, { borderTopColor: theme.cardBorder }]}>
             <View style={styles.macroRow}>
               <ThemedText type="defaultSemiBold">{activeDraft.mealTitle}</ThemedText>
               <ThemedText style={styles.macroText}>
@@ -146,20 +184,25 @@ export default function LogMealScreen() {
               </ThemedText>
             </View>
             <View style={styles.actionButtons}>
-              <Pressable style={[styles.actionBtn, styles.saveBtn]} onPress={onSave}>
-                <ThemedText style={styles.saveBtnText}>
+              <Pressable
+                style={[styles.actionBtn, styles.saveBtn, { backgroundColor: theme.primary }]}
+                onPress={onSave}
+              >
+                <ThemedText style={[styles.saveBtnText, { color: theme.accent }]}>
                   {editingMealId ? 'Save Changes' : 'Save Meal'}
                 </ThemedText>
               </Pressable>
-              <Pressable style={styles.actionBtn} onPress={onReset}>
+              <Pressable
+                style={[styles.actionBtn, { borderColor: theme.cardBorder }]}
+                onPress={onReset}
+              >
                 <ThemedText>Start Over</ThemedText>
               </Pressable>
             </View>
           </ThemedView>
         )}
 
-        {/* Input bar */}
-        <ThemedView style={styles.inputBar}>
+        <ThemedView style={[styles.inputBar, { borderTopColor: theme.cardBorder }]}>
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -168,19 +211,23 @@ export default function LogMealScreen() {
                 ? 'Or type your own answer...'
                 : 'e.g. chicken nuggets with sauce...'
             }
-            placeholderTextColor="#999"
-            style={styles.input}
+            placeholderTextColor={theme.tabIconDefault}
+            style={[styles.input, { borderColor: theme.cardBorder, color: theme.text }]}
             multiline
             returnKeyType="send"
             onSubmitEditing={onSend}
             editable={!isInterpreting}
           />
           <Pressable
-            style={[styles.sendBtn, !canSubmit && styles.sendBtnDisabled]}
+            style={[
+              styles.sendBtn,
+              { backgroundColor: theme.primary },
+              !canSubmit && [styles.sendBtnDisabled, { backgroundColor: theme.surface }],
+            ]}
             onPress={onSend}
             disabled={!canSubmit}
           >
-            <ThemedText style={styles.sendBtnText}>↑</ThemedText>
+            <ThemedText style={[styles.sendBtnText, { color: theme.accent }]}>↑</ThemedText>
           </Pressable>
         </ThemedView>
       </KeyboardAvoidingView>
@@ -215,15 +262,13 @@ const styles = StyleSheet.create({
   },
   bubbleUser: {
     alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
     borderBottomRightRadius: 4,
   },
   bubbleAssistant: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F0F0F0',
     borderBottomLeftRadius: 4,
   },
-  bubbleTextUser: { color: '#fff' },
+  bubbleTextUser: {},
   typingBubble: { paddingVertical: 14, paddingHorizontal: 18 },
   chipsContainer: {
     flexDirection: 'row',
@@ -237,18 +282,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1.5,
-    borderColor: '#007AFF',
-    backgroundColor: '#F0F6FF',
   },
-  chipPressed: { backgroundColor: '#007AFF' },
-  chipText: { color: '#007AFF', fontSize: 14, fontWeight: '500' },
-  errorBanner: { borderRadius: 10, padding: 12, backgroundColor: '#FFF0F0' },
+  chipText: { fontSize: 14, fontWeight: '500' },
+  errorBanner: { borderRadius: 10, padding: 12 },
   errorText: { color: '#B00020', fontSize: 13 },
   actionBar: {
     padding: 12,
     gap: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#DDD',
   },
   macroRow: { gap: 2 },
   macroText: { opacity: 0.7, fontSize: 13 },
@@ -258,22 +299,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#CCC',
   },
-  saveBtn: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
-  saveBtnText: { color: '#fff', fontWeight: '600' },
+  saveBtn: { borderWidth: 0 },
+  saveBtnText: { fontWeight: '600' },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 10,
     gap: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#DDD',
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#CCC',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -284,10 +322,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnDisabled: { backgroundColor: '#C0C0C0' },
-  sendBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  sendBtnDisabled: {},
+  sendBtnText: { fontSize: 18, fontWeight: '700' },
 });

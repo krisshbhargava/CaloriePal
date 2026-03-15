@@ -1,7 +1,6 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 
-import { mockMeals } from '@/data/mock-meals';
 import {
   ChatMessage,
   ChatSessionStatus,
@@ -10,6 +9,20 @@ import {
   MealInterpretationResponse,
 } from '@/models/domain';
 import { GroqMessage, interpretMealWithGroq } from '@/services/ai-meal-interpreter';
+
+export type MacroGoals = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
+
+const DEFAULT_MACRO_GOALS: MacroGoals = {
+  calories: 2000,
+  protein: 150,
+  carbs: 200,
+  fat: 65,
+};
 
 type AppStateContextValue = {
   meals: MealEntry[];
@@ -21,12 +34,16 @@ type AppStateContextValue = {
   pendingInterpretation: MealInterpretationResponse | null;
   lastSavedMeal: MealEntry | null;
   editingMealId: string | null;
+  dateNotes: Record<string, string>;
+  macroGoals: MacroGoals;
+  setMacroGoals: (updates: Partial<MacroGoals>) => void;
   sendMessage: (text: string) => Promise<void>;
   saveMealFromInterpretation: (description: string) => MealEntry | null;
   editMeal: (id: string, updates: { title?: string; calories: number; protein: number; carbs: number; fat: number }) => void;
   startEditSession: (meal: MealEntry) => void;
   clearLastSavedMeal: () => void;
   resetChatSession: () => void;
+  setDateNote: (dateKey: string, note: string) => void;
 };
 
 const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
@@ -40,7 +57,7 @@ function makeChatMessage(message: Omit<ChatMessage, 'id' | 'createdAt'>): ChatMe
 }
 
 export function AppStoreProvider({ children }: PropsWithChildren) {
-  const [meals, setMeals] = useState<MealEntry[]>(mockMeals);
+  const [meals, setMeals] = useState<MealEntry[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatStatus, setChatStatus] = useState<ChatSessionStatus>('awaiting_input');
   const [chatError, setChatError] = useState<string | null>(null);
@@ -49,6 +66,29 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const [pendingInterpretation, setPendingInterpretation] = useState<MealInterpretationResponse | null>(null);
   const [lastSavedMeal, setLastSavedMeal] = useState<MealEntry | null>(null);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
+  const [dateNotes, setDateNotes] = useState<Record<string, string>>({});
+  const [macroGoals, setMacroGoalsState] = useState<MacroGoals>(DEFAULT_MACRO_GOALS);
+
+  const setMacroGoals = useCallback((updates: Partial<MacroGoals>) => {
+    setMacroGoalsState((prev) => {
+      const next = { ...prev };
+      (Object.keys(updates) as (keyof MacroGoals)[]).forEach((key) => {
+        const v = updates[key];
+        if (typeof v === 'number' && v >= 0) next[key] = Math.round(v);
+      });
+      return next;
+    });
+  }, []);
+
+  const setDateNote = useCallback((dateKey: string, note: string) => {
+    setDateNotes((prev) => {
+      const next = { ...prev };
+      const trimmed = note.trim();
+      if (trimmed) next[dateKey] = trimmed;
+      else delete next[dateKey];
+      return next;
+    });
+  }, []);
 
   const sessionHistoryRef = useRef<GroqMessage[]>([]);
 
@@ -225,12 +265,16 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       pendingInterpretation,
       lastSavedMeal,
       editingMealId,
+      dateNotes,
+      macroGoals,
+      setMacroGoals,
       sendMessage,
       saveMealFromInterpretation,
       editMeal,
       startEditSession,
       clearLastSavedMeal,
       resetChatSession,
+      setDateNote,
     }),
     [
       meals,
@@ -242,12 +286,16 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       pendingInterpretation,
       lastSavedMeal,
       editingMealId,
+      dateNotes,
+      macroGoals,
+      setMacroGoals,
       sendMessage,
       saveMealFromInterpretation,
       editMeal,
       startEditSession,
       clearLastSavedMeal,
       resetChatSession,
+      setDateNote,
     ]
   );
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
-import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -8,6 +9,8 @@ import { Colors, Fonts, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getDateKey } from '@/services/macro-aggregation';
 import { useAppStore } from '@/store/app-store';
+
+const TOP_INSET_EXTRA = 12;
 
 type CalendarDay = {
   date: Date;
@@ -59,11 +62,18 @@ function buildMonthDays(mealsByDate: Record<string, { calories: number }>, month
 }
 
 export default function ExploreCalendarScreen() {
-  const { meals } = useAppStore();
+  const { meals, dateNotes, setDateNote } = useAppStore();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => getDateKey(new Date()));
+
+  const selectedNote = dateNotes[selectedDateKey] ?? '';
+  const selectedDateLabel = useMemo(() => {
+    const d = new Date(selectedDateKey);
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }, [selectedDateKey]);
 
   const mealsByDate = useMemo(() => {
     const grouped: Record<string, { calories: number; ids: string[] }> = {};
@@ -109,7 +119,7 @@ export default function ExploreCalendarScreen() {
   return (
     <ScrollView
       style={[styles.scroll, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + TOP_INSET_EXTRA }]}
       showsVerticalScrollIndicator={false}>
       <View style={styles.centered}>
         <ThemedView style={styles.header}>
@@ -149,6 +159,7 @@ export default function ExploreCalendarScreen() {
 
                 const isSelected = day.dateKey === selectedDateKey;
                 const hasCalories = day.calories > 0;
+                const hasNote = !!(dateNotes[day.dateKey]?.trim());
 
                 return (
                   <Pressable
@@ -160,6 +171,9 @@ export default function ExploreCalendarScreen() {
                       hasCalories && !isSelected && styles.dayCellWithMeals,
                     ]}
                     onPress={() => setSelectedDateKey(day.dateKey)}>
+                    {hasNote && (
+                      <View style={[styles.noteDot, { backgroundColor: theme.accent }]} />
+                    )}
                     <ThemedText
                       type="defaultSemiBold"
                       style={[
@@ -200,6 +214,22 @@ export default function ExploreCalendarScreen() {
               </ThemedView>
             ))
           )}
+        </ThemedView>
+
+        <ThemedView style={[styles.notesCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+          <ThemedText type="subtitle">Notes for {selectedDateLabel}</ThemedText>
+          <ThemedText style={styles.notesHint}>
+            e.g. meal didn&apos;t sit well, had a headache, felt great
+          </ThemedText>
+          <TextInput
+            value={selectedNote}
+            onChangeText={(text) => setDateNote(selectedDateKey, text)}
+            placeholder="Add a note for this day..."
+            placeholderTextColor={theme.tabIconDefault}
+            style={[styles.notesInput, { borderColor: theme.cardBorder, color: theme.text }]}
+            multiline
+            numberOfLines={3}
+          />
         </ThemedView>
       </View>
     </ScrollView>
@@ -286,5 +316,31 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
     borderLeftWidth: 4,
+  },
+  noteDot: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  notesCard: {
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+  },
+  notesHint: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 88,
+    textAlignVertical: 'top',
   },
 });
