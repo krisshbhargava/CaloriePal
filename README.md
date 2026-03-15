@@ -1,50 +1,89 @@
-# Welcome to your Expo app 👋
+# CaloriePal
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native (Expo) app for tracking calories and macros through natural language chat. Describe what you ate, answer a few quick questions, and CaloriePal logs the macros automatically.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Conversational meal logging** — type what you ate in plain English; the AI asks targeted follow-up questions (sauces, portion size, cooking method, etc.) before committing to an estimate
+- **Button-based clarification** — follow-up questions come with tappable option chips so you rarely have to type more than once
+- **Meal summary modal** — after confirming, a clean popup shows calories, protein, carbs, and fat before resetting the chat
+- **Edit past meals** — tap any logged meal to edit macros manually or re-open the AI chat with the original meal pre-loaded as context
+- **Daily macro progress** — dashboard shows progress bars toward your calorie and macro goals
+- **Animated typing indicator** — three-dot pulse while the AI is thinking
 
-   ```bash
-   npm install
-   ```
+## Tech stack
 
-2. Start the app
+- [Expo](https://expo.dev) (SDK 54, New Architecture enabled)
+- [Expo Router](https://expo.dev/router) for file-based navigation
+- [xAI Grok](https://x.ai) (`grok-3-mini`) for meal interpretation
+- React Context for state management
+- TypeScript throughout
 
-   ```bash
-   npx expo start
-   ```
+## Setup
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### 1. Install dependencies
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Add your xAI API key
 
-## Learn more
+Create a `.env` file in the project root:
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+EXPO_PUBLIC_GROQ_API_KEY=xai-your_key_here
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Get a key at [console.x.ai](https://console.x.ai). The `EXPO_PUBLIC_` prefix is required for Expo to expose the variable to the app bundle.
 
-## Join the community
+> **Note:** This key is included in the app bundle and visible to anyone who inspects it. Fine for personal/prototype use — for production, route API calls through a backend.
 
-Join our community of developers creating universal apps.
+### 3. Start the app
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npx expo start
+```
+
+Press `i` for iOS simulator, `a` for Android, or scan the QR code with Expo Go on your phone.
+
+If the simulator fails to connect, try:
+
+```bash
+npx expo start --clear
+```
+
+Or for network issues:
+
+```bash
+npx expo start --tunnel
+```
+
+## Project structure
+
+```
+app/
+  (tabs)/
+    index.tsx        # Dashboard — daily macro totals + meal list
+    log-meal.tsx     # Chat interface for logging meals
+    my-macros.tsx    # Weekly macro analytics
+components/
+  meal-summary-modal.tsx   # Post-save confirmation popup
+  edit-meal-modal.tsx      # Manual or AI-assisted meal editing
+  typing-dots.tsx          # Animated three-dot indicator
+services/
+  ai-meal-interpreter.ts   # xAI API call + response parsing
+  macro-aggregation.ts     # Daily/weekly macro summaries
+store/
+  app-store.tsx            # React Context — all app state
+models/
+  domain.ts                # TypeScript types
+```
+
+## Chat flow
+
+1. User describes a meal (e.g. "chicken nuggets with sauce")
+2. AI asks 1–3 targeted questions with button options (e.g. "What sauce?" → Ranch / BBQ / None / Other)
+3. Once it has enough detail, AI returns a macro estimate
+4. User confirms → meal is saved and a summary modal appears
+5. Chat resets, ready for the next meal
