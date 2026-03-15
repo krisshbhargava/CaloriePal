@@ -1,4 +1,5 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { router } from 'expo-router';
 
 import { mockMeals } from '@/data/mock-meals';
 import {
@@ -18,8 +19,13 @@ type AppStateContextValue = {
   isInterpreting: boolean;
   activeDraft: MealDraft | null;
   pendingInterpretation: MealInterpretationResponse | null;
+  lastSavedMeal: MealEntry | null;
+  editingMealId: string | null;
   sendMessage: (text: string) => Promise<void>;
   saveMealFromInterpretation: (description: string) => MealEntry | null;
+  editMeal: (id: string, updates: { title?: string; calories: number; protein: number; carbs: number; fat: number }) => void;
+  startEditSession: (meal: MealEntry) => void;
+  clearLastSavedMeal: () => void;
   resetChatSession: () => void;
 };
 
@@ -40,10 +46,10 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const [chatError, setChatError] = useState<string | null>(null);
   const [isInterpreting, setIsInterpreting] = useState(false);
   const [activeDraft, setActiveDraft] = useState<MealDraft | null>(null);
-  const [pendingInterpretation, setPendingInterpretation] =
-    useState<MealInterpretationResponse | null>(null);
+  const [pendingInterpretation, setPendingInterpretation] = useState<MealInterpretationResponse | null>(null);
+  const [lastSavedMeal, setLastSavedMeal] = useState<MealEntry | null>(null);
+  const [editingMealId, setEditingMealId] = useState<string | null>(null);
 
-  // Groq/xAI conversation history — reset each session
   const sessionHistoryRef = useRef<GroqMessage[]>([]);
 
   const appendChatMessage = useCallback((message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
@@ -59,7 +65,6 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       setIsInterpreting(true);
       setChatStatus('awaiting_input');
 
-      // Add user message to UI and session history
       appendChatMessage({ role: 'user', text: trimmed, type: 'message' });
       sessionHistoryRef.current = [...sessionHistoryRef.current, { role: 'user', content: trimmed }];
 
@@ -115,7 +120,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       setChatStatus('saving');
 
       const meal: MealEntry = {
-        id: buildId('meal'),
+        id: editingMealId ?? buildId('meal'),
         title: activeDraft.mealTitle,
         description: description.trim() || activeDraft.sourceText,
         timestamp: new Date().toISOString(),
@@ -128,16 +133,75 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         source: 'ai',
       };
 
-      setMeals((prev) => [meal, ...prev]);
+      if (editingMealId) {
+        // Replace the existing meal
+        setMeals((prev) => prev.map((m) => (m.id === editingMealId ? meal : m)));
+      } else {
+        setMeals((prev) => [meal, ...prev]);
+      }
+
       setPendingInterpretation(null);
       setActiveDraft(null);
+      setEditingMealId(null);
       setChatStatus('saved');
       setChatError(null);
-      appendChatMessage({ role: 'assistant', text: 'Saved! Nice work logging today.', type: 'confirmation' });
+      setLastSavedMeal(meal);
       return meal;
     },
-    [activeDraft, appendChatMessage, pendingInterpretation]
+    [activeDraft, pendingInterpretation, editingMealId]
   );
+
+  const editMeal = useCallback(
+    (id: string, updates: { title?: string; calories: number; protein: number; carbs: number; fat: number }) => {
+      setMeals((prev) =>
+        prev.map((m) =>
+          m.id === id ? { ...m, ...updates } : m
+        )
+      );
+    },
+    []
+  );
+
+  const startEditSession = useCallback(
+    (meal: MealEntry) => {
+      // Reset chat state
+      setPendingInterpretation(null);
+      setActiveDraft(null);
+      setChatError(null);
+      setChatStatus('awaiting_input');
+      setIsInterpreting(false);
+      setEditingMealId(meal.id);
+
+      const contextMessage = `I want to edit a meal I previously logged: "${meal.title}" — ${meal.calories} kcal, ${meal.protein}g protein, ${meal.carbs}g carbs, ${meal.fat}g fat.`;
+      const assistantGreeting = `Sure! I have your **${meal.title}** logged at ${meal.calories} kcal. What would you like to change?`;
+
+      // Prime the session history with context
+      sessionHistoryRef.current = [
+        { role: 'user', content: contextMessage },
+        { role: 'assistant', content: assistantGreeting },
+      ];
+
+      setChatMessages([
+        makeChatMessage({ role: 'user', text: contextMessage, type: 'message' }),
+        makeChatMessage({ role: 'assistant', text: assistantGreeting, type: 'message' }),
+      ]);
+
+      router.push('/(tabs)/log-meal');
+    },
+    []
+  );
+
+  const clearLastSavedMeal = useCallback(() => {
+    setLastSavedMeal(null);
+    // Also reset the chat so it's ready for the next meal
+    setPendingInterpretation(null);
+    setActiveDraft(null);
+    setChatError(null);
+    setChatStatus('awaiting_input');
+    setIsInterpreting(false);
+    sessionHistoryRef.current = [];
+    setChatMessages([]);
+  }, []);
 
   const resetChatSession = useCallback(() => {
     setPendingInterpretation(null);
@@ -145,7 +209,9 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     setChatError(null);
     setChatStatus('awaiting_input');
     setIsInterpreting(false);
+    setEditingMealId(null);
     sessionHistoryRef.current = [];
+    setChatMessages([]);
   }, []);
 
   const value = useMemo<AppStateContextValue>(
@@ -157,8 +223,13 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       isInterpreting,
       activeDraft,
       pendingInterpretation,
+      lastSavedMeal,
+      editingMealId,
       sendMessage,
       saveMealFromInterpretation,
+      editMeal,
+      startEditSession,
+      clearLastSavedMeal,
       resetChatSession,
     }),
     [
@@ -169,8 +240,13 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       isInterpreting,
       activeDraft,
       pendingInterpretation,
+      lastSavedMeal,
+      editingMealId,
       sendMessage,
       saveMealFromInterpretation,
+      editMeal,
+      startEditSession,
+      clearLastSavedMeal,
       resetChatSession,
     ]
   );
