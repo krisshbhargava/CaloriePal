@@ -1,10 +1,18 @@
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Layout } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/store/app-store';
 
 export default function LogMealScreen() {
@@ -12,229 +20,271 @@ export default function LogMealScreen() {
     chatMessages,
     chatStatus,
     chatError,
-    pendingInterpretation,
-    requestMealInterpretation,
-    chooseClarificationOption,
+    isInterpreting,
+    activeDraft,
+    sendMessage,
     saveMealFromInterpretation,
     resetChatSession,
   } = useAppStore();
-  const colorScheme = useColorScheme() ?? 'light';
-  const theme = Colors[colorScheme];
+
   const [draft, setDraft] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
 
-  const canSubmit = draft.trim().length > 3;
+  const canSubmit = draft.trim().length > 2 && !isInterpreting;
+  const isReadyToSave = chatStatus === 'ready_to_confirm' && activeDraft;
 
-  const recentMessages = useMemo(() => chatMessages.slice(-4), [chatMessages]);
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }, [chatMessages, isInterpreting]);
 
-  const onInterpret = () => {
+  const onSend = async () => {
     if (!canSubmit) return;
-    requestMealInterpretation(draft);
+    const text = draft.trim();
+    setDraft('');
+    await sendMessage(text);
   };
 
   const onSave = () => {
-    const saved = saveMealFromInterpretation({ description: draft });
+    const saved = saveMealFromInterpretation(draft);
     if (!saved) {
-      Alert.alert('Meal not ready', 'Please wait for a ready estimate before saving.');
+      Alert.alert('Not ready', 'Please wait for a confirmed estimate before saving.');
       return;
     }
-    Alert.alert('Saved', `${saved.title} was added to your meals.`);
+    setDraft('');
+    Alert.alert('Saved!', `${saved.title} was added to your log.`);
+  };
+
+  const onReset = () => {
+    resetChatSession();
     setDraft('');
   };
 
-  const onChooseClarification = (option: string) => {
-    chooseClarificationOption(option);
-  };
-
   return (
-    <ScrollView
-      style={[styles.scroll, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}>
-      <View style={styles.centered}>
-        <ThemedView style={[styles.headerCard, { backgroundColor: theme.accent }]}>
-          <ThemedText type="title" lightColor={theme.background} darkColor={theme.background}>
-            Log New Meal
-          </ThemedText>
-          <ThemedText lightColor="rgba(255,255,255,0.9)" darkColor="rgba(255,255,255,0.9)">
-            Describe your meal in your own words.
-          </ThemedText>
-        </ThemedView>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={90}
+    >
+      {/* Chat history */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.flex}
+        contentContainerStyle={styles.messageList}
+        keyboardShouldPersistTaps="handled"
+      >
+        {chatMessages.length === 0 ? (
+          <View style={styles.emptyState}>
+            <ThemedText type="title" style={styles.emptyTitle}>CaloriePal</ThemedText>
+            <ThemedText style={styles.emptyHint}>
+              Describe what you ate and I'll estimate the macros. Ask me to clarify anything.
+            </ThemedText>
+          </View>
+        ) : (
+          chatMessages.map((msg) => (
+            <View
+              key={msg.id}
+              style={[styles.bubble, msg.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant]}
+            >
+              <ThemedText style={msg.role === 'user' ? styles.bubbleTextUser : undefined}>
+                {msg.text}
+              </ThemedText>
+            </View>
+          ))
+        )}
 
-        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
-          <ThemedText type="defaultSemiBold">What did you eat?</ThemedText>
-          <ThemedText>Status: {chatStatus.replaceAll('_', ' ')}</ThemedText>
-          {!!chatError && (
-            <ThemedText style={[styles.errorText, { color: '#b91c1c' }]}>{chatError}</ThemedText>
-          )}
+        {isInterpreting && (
+          <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
+            <ActivityIndicator size="small" />
+          </View>
+        )}
+
+        {!!chatError && (
+          <ThemedView style={styles.errorBanner}>
+            <ThemedText style={styles.errorText}>{chatError}</ThemedText>
+          </ThemedView>
+        )}
+      </ScrollView>
+
+      {/* Save / Reset actions when estimate is ready */}
+      {isReadyToSave && (
+        <ThemedView style={styles.actionBar}>
+          <View style={styles.macroRow}>
+            <ThemedText type="defaultSemiBold">{activeDraft.mealTitle}</ThemedText>
+            <ThemedText style={styles.macroText}>
+              {activeDraft.estimatedMacros.calories} kcal · {activeDraft.estimatedMacros.protein}g P ·{' '}
+              {activeDraft.estimatedMacros.carbs}g C · {activeDraft.estimatedMacros.fat}g F
+            </ThemedText>
+          </View>
+          <View style={styles.actionButtons}>
+            <Pressable style={[styles.actionBtn, styles.saveBtn]} onPress={onSave}>
+              <ThemedText style={styles.saveBtnText}>Save Meal</ThemedText>
+            </Pressable>
+            <Pressable style={styles.actionBtn} onPress={onReset}>
+              <ThemedText>Start Over</ThemedText>
+            </Pressable>
+          </View>
+        </ThemedView>
+      )}
+
+      {chatStatus === 'saved' && (
+        <ThemedView style={styles.actionBar}>
+          <Pressable style={[styles.actionBtn, styles.saveBtn]} onPress={onReset}>
+            <ThemedText style={styles.saveBtnText}>Log Another Meal</ThemedText>
+          </Pressable>
+        </ThemedView>
+      )}
+
+      {/* Input bar */}
+      {chatStatus !== 'saved' && (
+        <ThemedView style={styles.inputBar}>
           <TextInput
             value={draft}
             onChangeText={setDraft}
+            placeholder="e.g. chicken rice bowl with veggies..."
+            placeholderTextColor="#999"
+            style={styles.input}
             multiline
-            placeholder="e.g. chicken rice bowl with veggies"
-            placeholderTextColor={theme.tabIconDefault}
-            style={[styles.input, { borderColor: theme.cardBorder, color: theme.text }]}
+            returnKeyType="send"
+            onSubmitEditing={onSend}
+            editable={!isInterpreting}
           />
           <Pressable
-            style={[
-              styles.buttonPrimary,
-              { backgroundColor: theme.primary },
-              !canSubmit && styles.buttonDisabled,
-            ]}
-            onPress={onInterpret}>
-            <ThemedText style={{ color: theme.accent }} type="defaultSemiBold">
-              Estimate Macros
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            style={[styles.buttonSecondary, { borderColor: theme.cardBorder }]}
-            onPress={() => resetChatSession()}>
-            <ThemedText type="defaultSemiBold">Reset session</ThemedText>
+            style={[styles.sendBtn, !canSubmit && styles.sendBtnDisabled]}
+            onPress={onSend}
+            disabled={!canSubmit}
+          >
+            <ThemedText style={styles.sendBtnText}>↑</ThemedText>
           </Pressable>
         </ThemedView>
-
-        {pendingInterpretation && (
-          <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
-            <ThemedText type="subtitle">Assistant response</ThemedText>
-            {pendingInterpretation.status === 'clarification_needed' ? (
-              <>
-                <ThemedText>{pendingInterpretation.clarificationQuestion}</ThemedText>
-                {!!pendingInterpretation.clarificationOptions?.length && (
-                  <View style={styles.options}>
-                    {pendingInterpretation.clarificationOptions.map((option) => (
-                      <Pressable
-                        key={option}
-                        style={[styles.optionChip, { borderColor: theme.accent }]}
-                        onPress={() => onChooseClarification(option)}>
-                        <ThemedText type="link">{option}</ThemedText>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-              </>
-            ) : (
-              <>
-                <ThemedText type="defaultSemiBold">
-                  {pendingInterpretation.mealTitle ?? 'Meal estimate'}
-                </ThemedText>
-                <ThemedText>
-                  {pendingInterpretation.estimatedMacros?.calories ?? 0} kcal • P{' '}
-                  {pendingInterpretation.estimatedMacros?.protein ?? 0} • C{' '}
-                  {pendingInterpretation.estimatedMacros?.carbs ?? 0} • F{' '}
-                  {pendingInterpretation.estimatedMacros?.fat ?? 0}
-                </ThemedText>
-                <ThemedText>Confidence: {Math.round(pendingInterpretation.confidence * 100)}%</ThemedText>
-                <Pressable
-                  style={[styles.buttonPrimary, { backgroundColor: theme.primary }]}
-                  onPress={onSave}>
-                  <ThemedText style={{ color: theme.accent }} type="defaultSemiBold">
-                    Confirm and save
-                  </ThemedText>
-                </Pressable>
-              </>
-            )}
-          </ThemedView>
-        )}
-
-        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
-          <ThemedText type="subtitle">Recent chat</ThemedText>
-          {recentMessages.length === 0 ? (
-            <ThemedText>No chat yet. Describe a meal above to start.</ThemedText>
-          ) : (
-            recentMessages.map((message) => (
-              <ThemedView
-                key={message.id}
-                style={[
-                  styles.chatBubble,
-                  {
-                    backgroundColor: message.role === 'user' ? theme.surface : theme.accent,
-                  },
-                ]}>
-                <ThemedText
-                  type="defaultSemiBold"
-                  lightColor={message.role === 'user' ? undefined : theme.background}
-                  darkColor={message.role === 'user' ? undefined : theme.background}>
-                  {message.role === 'user' ? 'You' : 'Assistant'}
-                </ThemedText>
-                <ThemedText
-                  lightColor={message.role === 'user' ? undefined : theme.background}
-                  darkColor={message.role === 'user' ? undefined : theme.background}>
-                  {message.text}
-                </ThemedText>
-              </ThemedView>
-            ))
-          )}
-        </ThemedView>
-      </View>
-    </ScrollView>
+      )}
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
-  content: {
-    padding: Layout.screenPadding,
-    paddingBottom: 40,
+  flex: {
+    flex: 1,
+  },
+  messageList: {
+    padding: 16,
+    gap: 10,
+    paddingBottom: 8,
     flexGrow: 1,
+    justifyContent: 'flex-end',
   },
-  centered: {
-    maxWidth: Layout.maxContentWidth,
-    width: '100%',
-    alignSelf: 'center',
-    gap: Layout.sectionGap,
-  },
-  headerCard: {
-    padding: Layout.cardPadding,
-    borderRadius: 16,
-    gap: 8,
-  },
-  section: {
-    padding: Layout.cardPadding,
-    borderRadius: 16,
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 60,
   },
-  card: {
-    borderWidth: 1,
+  emptyTitle: {
+    textAlign: 'center',
   },
-  input: {
-    minHeight: 100,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    textAlignVertical: 'top',
-    fontSize: 16,
+  emptyHint: {
+    textAlign: 'center',
+    opacity: 0.6,
+    lineHeight: 22,
   },
-  buttonPrimary: {
-    borderRadius: 12,
-    paddingHorizontal: 20,
+  bubble: {
+    maxWidth: '80%',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  bubbleUser: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#007AFF',
+    borderBottomRightRadius: 4,
+  },
+  bubbleAssistant: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F0F0F0',
+    borderBottomLeftRadius: 4,
+  },
+  bubbleTextUser: {
+    color: '#fff',
+  },
+  typingBubble: {
     paddingVertical: 14,
-    alignItems: 'center',
+    paddingHorizontal: 18,
   },
-  buttonSecondary: {
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
+  errorBanner: {
+    borderRadius: 10,
+    padding: 12,
+    backgroundColor: '#FFF0F0',
   },
   errorText: {
-    fontSize: 14,
+    color: '#B00020',
+    fontSize: 13,
   },
-  options: {
+  actionBar: {
+    padding: 12,
+    gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#DDD',
+  },
+  macroRow: {
+    gap: 2,
+  },
+  macroText: {
+    opacity: 0.7,
+    fontSize: 13,
+  },
+  actionButtons: {
+    flexDirection: 'row',
     gap: 8,
   },
-  optionChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  actionBtn: {
     borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderWidth: 1,
-    alignSelf: 'flex-start',
+    borderColor: '#CCC',
   },
-  chatBubble: {
-    borderRadius: 12,
-    padding: 12,
-    gap: 4,
+  saveBtn: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    padding: 10,
+    gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#DDD',
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#CCC',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    maxHeight: 100,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: {
+    backgroundColor: '#C0C0C0',
+  },
+  sendBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

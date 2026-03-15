@@ -1,32 +1,25 @@
-import { PropsWithChildren, createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { PropsWithChildren, createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 import { mockMeals } from '@/data/mock-meals';
 import {
-    ChatMessage,
-    ChatSessionStatus,
-    MealDraft,
-    MealEntry,
-    MealInterpretationResponse,
+  ChatMessage,
+  ChatSessionStatus,
+  MealDraft,
+  MealEntry,
+  MealInterpretationResponse,
 } from '@/models/domain';
-import { interpretMealMessage } from '@/services/ai-meal-interpreter';
-
-type SaveMealInput = {
-  description: string;
-  title?: string;
-};
+import { GroqMessage, interpretMealWithGroq } from '@/services/ai-meal-interpreter';
 
 type AppStateContextValue = {
   meals: MealEntry[];
   chatMessages: ChatMessage[];
   chatStatus: ChatSessionStatus;
   chatError: string | null;
+  isInterpreting: boolean;
   activeDraft: MealDraft | null;
-  lastUserInput: string;
   pendingInterpretation: MealInterpretationResponse | null;
-  addChatMessage: (message: Omit<ChatMessage, 'id' | 'createdAt'>) => void;
-  requestMealInterpretation: (text: string) => MealInterpretationResponse;
-  chooseClarificationOption: (optionText: string) => MealInterpretationResponse;
-  saveMealFromInterpretation: (input: SaveMealInput) => MealEntry | null;
+  sendMessage: (text: string) => Promise<void>;
+  saveMealFromInterpretation: (description: string) => MealEntry | null;
   resetChatSession: () => void;
 };
 
@@ -36,109 +29,86 @@ function buildId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function makeChatMessage(message: Omit<ChatMessage, 'id' | 'createdAt'>): ChatMessage {
+  return { id: buildId('chat'), createdAt: new Date().toISOString(), ...message };
+}
+
 export function AppStoreProvider({ children }: PropsWithChildren) {
   const [meals, setMeals] = useState<MealEntry[]>(mockMeals);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatStatus, setChatStatus] = useState<ChatSessionStatus>('awaiting_input');
   const [chatError, setChatError] = useState<string | null>(null);
+  const [isInterpreting, setIsInterpreting] = useState(false);
   const [activeDraft, setActiveDraft] = useState<MealDraft | null>(null);
-  const [lastUserInput, setLastUserInput] = useState('');
   const [pendingInterpretation, setPendingInterpretation] =
     useState<MealInterpretationResponse | null>(null);
 
-  const addChatMessage = useCallback((message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
-    const newMessage: ChatMessage = {
-      id: buildId('chat'),
-      createdAt: new Date().toISOString(),
-      ...message,
-    };
+  // Groq/xAI conversation history — reset each session
+  const sessionHistoryRef = useRef<GroqMessage[]>([]);
 
-    setChatMessages((previous) => [...previous, newMessage]);
+  const appendChatMessage = useCallback((message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
+    setChatMessages((prev) => [...prev, makeChatMessage(message)]);
   }, []);
 
-  const requestMealInterpretation = useCallback(
-    (text: string) => {
-      const trimmedText = text.trim();
+  const sendMessage = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isInterpreting) return;
+
       setChatError(null);
+      setIsInterpreting(true);
+      setChatStatus('awaiting_input');
 
-      if (trimmedText.length < 4) {
-        const response: MealInterpretationResponse = {
-          status: 'clarification_needed',
-          normalizedInput: trimmedText.toLowerCase(),
-          clarificationQuestion: 'Please add a little more detail so I can estimate macros.',
-          clarificationOptions: ['Include ingredient names', 'Add rough quantity'],
-          confidence: 0.55,
-          assumptions: ['Input was too short'],
-        };
+      // Add user message to UI and session history
+      appendChatMessage({ role: 'user', text: trimmed, type: 'message' });
+      sessionHistoryRef.current = [...sessionHistoryRef.current, { role: 'user', content: trimmed }];
 
+      try {
+        const response = await interpretMealWithGroq(sessionHistoryRef.current);
         setPendingInterpretation(response);
-        setActiveDraft(null);
-        setChatStatus('awaiting_clarification');
-        return response;
-      }
 
-      addChatMessage({ role: 'user', text: trimmedText, type: 'message' });
-      setLastUserInput(trimmedText);
-
-      const response = interpretMealMessage(trimmedText);
-      setPendingInterpretation(response);
-
-      if (response.status === 'clarification_needed') {
-        setActiveDraft(null);
-        setChatStatus('awaiting_clarification');
-        addChatMessage({
-          role: 'assistant',
-          text: response.clarificationQuestion ?? 'Could you clarify a bit more?',
-          type: 'clarification',
-        });
-      } else {
-        const estimated = response.estimatedMacros;
-        if (!estimated || !response.mealTitle) {
-          setChatStatus('error');
-          setChatError('Estimate payload incomplete. Please try describing the meal again.');
-          return {
-            status: 'clarification_needed',
-            normalizedInput: response.normalizedInput,
-            clarificationQuestion: 'I need one more detail before saving. Could you rephrase the meal?',
-            clarificationOptions: ['Retry with ingredients'],
-            confidence: 0.55,
-            assumptions: ['Interpreter returned missing fields'],
-          };
+        if (response.status === 'clarification_needed') {
+          const question = response.clarificationQuestion ?? 'Can you tell me more?';
+          appendChatMessage({ role: 'assistant', text: question, type: 'clarification' });
+          sessionHistoryRef.current = [
+            ...sessionHistoryRef.current,
+            { role: 'assistant', content: question },
+          ];
+          setActiveDraft(null);
+          setChatStatus('awaiting_clarification');
+        } else {
+          const macros = response.estimatedMacros!;
+          const summary = `Got it! Here's my estimate for **${response.mealTitle}**:\n${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat\n\nDoes that look right?`;
+          appendChatMessage({ role: 'assistant', text: summary, type: 'confirmation' });
+          sessionHistoryRef.current = [
+            ...sessionHistoryRef.current,
+            { role: 'assistant', content: summary },
+          ];
+          setActiveDraft({
+            sourceText: trimmed,
+            mealTitle: response.mealTitle!,
+            estimatedMacros: macros,
+            confidence: response.confidence,
+            assumptions: response.assumptions,
+          });
+          setChatStatus('ready_to_confirm');
         }
-
-        setActiveDraft({
-          sourceText: trimmedText,
-          mealTitle: response.mealTitle,
-          estimatedMacros: estimated,
-          confidence: response.confidence,
-          assumptions: response.assumptions,
-        });
-        setChatStatus('ready_to_confirm');
-        addChatMessage({
-          role: 'assistant',
-          text: `Estimated: ${estimated.calories} kcal. Confirm to save.`,
-          type: 'confirmation',
-        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Something went wrong.';
+        setChatError(message);
+        setChatStatus('error');
+      } finally {
+        setIsInterpreting(false);
       }
-
-      return response;
     },
-    [addChatMessage]
-  );
-
-  const chooseClarificationOption = useCallback(
-    (optionText: string) => {
-      const composedInput = `${lastUserInput} ${optionText}`.trim();
-      return requestMealInterpretation(composedInput || optionText);
-    },
-    [lastUserInput, requestMealInterpretation]
+    [appendChatMessage, isInterpreting]
   );
 
   const saveMealFromInterpretation = useCallback(
-    (input: SaveMealInput) => {
-      if (!pendingInterpretation || pendingInterpretation.status !== 'ready' || !activeDraft) {
-        setChatStatus('error');
+    (description: string) => {
+      if (!activeDraft || !pendingInterpretation || pendingInterpretation.status !== 'ready') {
         setChatError('No confirmed meal draft is available to save yet.');
+        setChatStatus('error');
         return null;
       }
 
@@ -146,8 +116,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       const meal: MealEntry = {
         id: buildId('meal'),
-        title: input.title ?? activeDraft.mealTitle,
-        description: input.description.trim() || activeDraft.sourceText,
+        title: activeDraft.mealTitle,
+        description: description.trim() || activeDraft.sourceText,
         timestamp: new Date().toISOString(),
         calories: activeDraft.estimatedMacros.calories,
         protein: activeDraft.estimatedMacros.protein,
@@ -158,23 +128,24 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         source: 'ai',
       };
 
-      setMeals((previous) => [meal, ...previous]);
+      setMeals((prev) => [meal, ...prev]);
       setPendingInterpretation(null);
       setActiveDraft(null);
       setChatStatus('saved');
       setChatError(null);
-      addChatMessage({ role: 'assistant', text: 'Saved. Nice work logging today.', type: 'confirmation' });
+      appendChatMessage({ role: 'assistant', text: 'Saved! Nice work logging today.', type: 'confirmation' });
       return meal;
     },
-    [activeDraft, addChatMessage, pendingInterpretation]
+    [activeDraft, appendChatMessage, pendingInterpretation]
   );
 
   const resetChatSession = useCallback(() => {
     setPendingInterpretation(null);
     setActiveDraft(null);
     setChatError(null);
-    setLastUserInput('');
     setChatStatus('awaiting_input');
+    setIsInterpreting(false);
+    sessionHistoryRef.current = [];
   }, []);
 
   const value = useMemo<AppStateContextValue>(
@@ -183,26 +154,22 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       chatMessages,
       chatStatus,
       chatError,
+      isInterpreting,
       activeDraft,
-      lastUserInput,
       pendingInterpretation,
-      addChatMessage,
-      requestMealInterpretation,
-      chooseClarificationOption,
+      sendMessage,
       saveMealFromInterpretation,
       resetChatSession,
     }),
     [
-      activeDraft,
-      addChatMessage,
-      chatError,
+      meals,
       chatMessages,
       chatStatus,
-      lastUserInput,
-      meals,
+      chatError,
+      isInterpreting,
+      activeDraft,
       pendingInterpretation,
-      requestMealInterpretation,
-      chooseClarificationOption,
+      sendMessage,
       saveMealFromInterpretation,
       resetChatSession,
     ]
@@ -213,10 +180,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
 export function useAppStore() {
   const context = useContext(AppStateContext);
-
   if (!context) {
     throw new Error('useAppStore must be used within AppStoreProvider');
   }
-
   return context;
 }
