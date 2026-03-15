@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MealSummaryModal } from '@/components/meal-summary-modal';
+import { TypingDots } from '@/components/typing-dots';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -163,7 +163,7 @@ export default function LogMealScreen() {
                 { backgroundColor: theme.surface },
               ]}
             >
-              <ActivityIndicator size="small" color={theme.accent} />
+              <TypingDots color={theme.accent} />
             </View>
           )}
 
