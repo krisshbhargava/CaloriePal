@@ -2,6 +2,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealComponent } from '@/models/domain';
 
 type Props = {
@@ -10,20 +12,29 @@ type Props = {
 };
 
 export function MealBreakdownList({ components, compact = false }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+
   if (components.length === 0) return null;
 
   return (
     <View style={styles.container}>
-      <ThemedText style={styles.label}>Breakdown</ThemedText>
+      <ThemedText style={[styles.label, { color: theme.tabIconDefault }]}>Breakdown</ThemedText>
       {components.map((component, index) => (
         <ThemedView
           key={`${component.quantity}-${component.name}-${index}`}
-          style={[styles.item, compact && styles.itemCompact]}>
+          lightColor={theme.surface}
+          darkColor={theme.surface}
+          style={[
+            styles.item,
+            compact && styles.itemCompact,
+            { borderColor: theme.cardBorder },
+          ]}>
           <ThemedText type="defaultSemiBold" style={styles.itemTitle}>
             {formatComponentLabel(component)}
           </ThemedText>
           <ThemedText style={styles.itemMacros}>
-            {component.calories} kcal · P {component.protein}g · C {component.carbs}g · F {component.fat}g
+            {component.calories} kcal | P {component.protein}g | C {component.carbs}g | F {component.fat}g
           </ThemedText>
         </ThemedView>
       ))}
@@ -43,7 +54,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    opacity: 0.5,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -51,7 +61,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     gap: 4,
-    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
   },
   itemCompact: {
     paddingVertical: 8,
@@ -61,7 +71,7 @@ const styles = StyleSheet.create({
   },
   itemMacros: {
     fontSize: 12,
-    opacity: 0.7,
+    opacity: 0.9,
     lineHeight: 18,
   },
 });

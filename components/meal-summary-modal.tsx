@@ -3,6 +3,8 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 
 type Props = {
@@ -12,6 +14,9 @@ type Props = {
 };
 
 export function MealSummaryModal({ meal, onDone, enabled = true }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+
   if (!meal || !enabled) return null;
 
   return (
@@ -19,40 +24,40 @@ export function MealSummaryModal({ meal, onDone, enabled = true }: Props) {
       <View style={styles.overlay}>
         <ThemedView style={styles.card}>
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.checkRow}>
-            <View style={styles.checkCircle}>
-              <ThemedText style={styles.checkIcon}>✓</ThemedText>
+            <View style={styles.checkRow}>
+              <View style={styles.checkCircle}>
+                <ThemedText style={styles.checkIcon}>?</ThemedText>
+              </View>
+              <ThemedText type="defaultSemiBold" style={styles.savedLabel}>Meal Saved</ThemedText>
             </View>
-            <ThemedText type="defaultSemiBold" style={styles.savedLabel}>Meal Saved</ThemedText>
-          </View>
 
-          <ThemedText type="title" style={styles.mealTitle}>{meal.title}</ThemedText>
+            <ThemedText type="title" style={styles.mealTitle}>{meal.title}</ThemedText>
 
-          <View style={styles.calorieBlock}>
-            <ThemedText style={styles.calorieNumber}>{meal.calories}</ThemedText>
-            <ThemedText style={styles.calorieUnit}>kcal</ThemedText>
-          </View>
-
-          <View style={styles.macroRow}>
-            <MacroPill label="Protein" value={meal.protein} />
-            <MacroPill label="Carbs" value={meal.carbs} />
-            <MacroPill label="Fat" value={meal.fat} />
-          </View>
-
-          <MealBreakdownList components={meal.components} />
-
-          {meal.assumptions.length > 0 && (
-            <View style={styles.assumptions}>
-              <ThemedText style={styles.assumptionsLabel}>Assumptions</ThemedText>
-              {meal.assumptions.map((a, i) => (
-                <ThemedText key={i} style={styles.assumption}>· {a}</ThemedText>
-              ))}
+            <View style={styles.calorieBlock}>
+              <ThemedText style={styles.calorieNumber}>{meal.calories}</ThemedText>
+              <ThemedText style={styles.calorieUnit}>kcal</ThemedText>
             </View>
-          )}
 
-          <Pressable style={styles.doneBtn} onPress={onDone}>
-            <ThemedText style={styles.doneBtnText}>Done</ThemedText>
-          </Pressable>
+            <View style={styles.macroRow}>
+              <MacroPill label="Protein" value={meal.protein} theme={theme} />
+              <MacroPill label="Carbs" value={meal.carbs} theme={theme} />
+              <MacroPill label="Fat" value={meal.fat} theme={theme} />
+            </View>
+
+            <MealBreakdownList components={meal.components} />
+
+            {meal.assumptions.length > 0 && (
+              <View style={styles.assumptions}>
+                <ThemedText style={styles.assumptionsLabel}>Assumptions</ThemedText>
+                {meal.assumptions.map((a, i) => (
+                  <ThemedText key={i} style={styles.assumption}>- {a}</ThemedText>
+                ))}
+              </View>
+            )}
+
+            <Pressable style={styles.doneBtn} onPress={onDone}>
+              <ThemedText style={styles.doneBtnText}>Done</ThemedText>
+            </Pressable>
           </ScrollView>
         </ThemedView>
       </View>
@@ -60,12 +65,23 @@ export function MealSummaryModal({ meal, onDone, enabled = true }: Props) {
   );
 }
 
-function MacroPill({ label, value }: { label: string; value: number }) {
+function MacroPill({
+  label,
+  value,
+  theme,
+}: {
+  label: string;
+  value: number;
+  theme: (typeof Colors)['light'];
+}) {
   return (
-    <View style={styles.pill}>
+    <ThemedView
+      lightColor={theme.surface}
+      darkColor={theme.surface}
+      style={[styles.pill, { borderColor: theme.cardBorder }]}>
       <ThemedText style={styles.pillValue}>{value}g</ThemedText>
-      <ThemedText style={styles.pillLabel}>{label}</ThemedText>
-    </View>
+      <ThemedText style={[styles.pillLabel, { color: theme.tabIconDefault }]}>{label}</ThemedText>
+    </ThemedView>
   );
 }
 
@@ -135,11 +151,11 @@ const styles = StyleSheet.create({
   },
   pill: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
     borderRadius: 14,
     padding: 12,
     alignItems: 'center',
     gap: 2,
+    borderWidth: 1,
   },
   pillValue: {
     fontSize: 18,
@@ -147,7 +163,6 @@ const styles = StyleSheet.create({
   },
   pillLabel: {
     fontSize: 12,
-    opacity: 0.5,
   },
   assumptions: {
     width: '100%',

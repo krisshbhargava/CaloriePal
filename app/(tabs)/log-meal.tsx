@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { MealSummaryModal } from '@/components/meal-summary-modal';
@@ -27,6 +29,7 @@ import { ChatSessionStatus, MealDraft } from '@/models/domain';
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
+const LISTENING_CUE = require('../../assets/Sfx/Blip6.wav');
 
 export default function LogMealScreen() {
   const {
@@ -58,6 +61,7 @@ export default function LogMealScreen() {
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+  const listeningCueRef = useRef<Audio.Sound | null>(null);
   const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingFinalTranscriptRef = useRef('');
@@ -67,6 +71,7 @@ export default function LogMealScreen() {
   const chatStatusRef = useRef<ChatSessionStatus>('awaiting_input');
   const activeDraftRef = useRef<MealDraft | null>(null);
   const isInterpretingRef = useRef(false);
+  const isListeningRef = useRef(false);
   const isSpeakingRef = useRef(false);
   const activeDraftSignatureRef = useRef('');
   const lastClarificationIdRef = useRef('');
@@ -82,6 +87,22 @@ export default function LogMealScreen() {
     if (restartTimeoutRef.current) {
       clearTimeout(restartTimeoutRef.current);
       restartTimeoutRef.current = null;
+    }
+  }, []);
+
+  const playListeningCue = useCallback(async () => {
+    try {
+      if (!listeningCueRef.current) {
+        const { sound } = await Audio.Sound.createAsync(LISTENING_CUE, {
+          shouldPlay: false,
+          volume: 1,
+        });
+        listeningCueRef.current = sound;
+      }
+
+      await listeningCueRef.current.replayAsync();
+    } catch {
+      // Non-blocking UX affordance only.
     }
   }, []);
 
@@ -105,7 +126,7 @@ export default function LogMealScreen() {
     (statusText: string) => {
       clearRestartTimeout();
 
-      if (!voiceModeEnabledRef.current || isInterpretingRef.current || isSpeakingRef.current) {
+      if (!voiceModeEnabledRef.current || isInterpretingRef.current || isListeningRef.current) {
         return;
       }
 
@@ -142,14 +163,11 @@ export default function LogMealScreen() {
     (text: string, onDone?: () => void) => {
       clearRestartTimeout();
       clearSpeechEndTimeout();
-      shouldResumeListeningRef.current = false;
       pendingFinalTranscriptRef.current = '';
       latestTranscriptRef.current = '';
-      ExpoSpeechRecognitionModule.abort();
-      Speech.stop().catch(() => undefined);
       setIsSpeaking(true);
-      setVoiceStatus('Speaking...');
-      setLiveTranscript('');
+      isSpeakingRef.current = true;
+      setVoiceStatus('Listening...');
 
       let completed = false;
       const finishSpeaking = (shouldContinue: boolean) => {
@@ -208,6 +226,10 @@ export default function LogMealScreen() {
   }, [isInterpreting]);
 
   useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
+
+  useEffect(() => {
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
 
@@ -220,12 +242,21 @@ export default function LogMealScreen() {
   }, [chatMessages, isInterpreting, liveTranscript, voiceModeEnabled, voiceStatus]);
 
   useEffect(() => {
+    void Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      staysActiveInBackground: false,
+    }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     return () => {
       clearRestartTimeout();
       clearSpeechEndTimeout();
       shouldResumeListeningRef.current = false;
       Speech.stop().catch(() => undefined);
       ExpoSpeechRecognitionModule.abort();
+      listeningCueRef.current?.unloadAsync().catch(() => undefined);
     };
   }, [clearRestartTimeout, clearSpeechEndTimeout]);
 
@@ -252,11 +283,8 @@ export default function LogMealScreen() {
       }
 
       lastClarificationIdRef.current = latestAssistantMessage.id;
-      const prompt = buildClarificationPrompt(
-        latestAssistantMessage.text,
-        pendingInterpretation?.clarificationOptions ?? []
-      );
-      speakText(prompt, () => startListening('Listening for your answer...'));
+      startListening('Listening for your answer...');
+      speakText(buildClarificationPrompt(latestAssistantMessage.text));
       return;
     }
 
@@ -274,22 +302,9 @@ export default function LogMealScreen() {
       }
 
       activeDraftSignatureRef.current = signature;
-      speakText(buildConfirmationPrompt(activeDraft), () =>
-        startListening('Say save to log it, or tell me what to change...')
-      );
+      startListening('Listening for save or changes...');
+      speakText(buildConfirmationPrompt(activeDraft));
       return;
-    }
-
-    if (chatStatus === 'awaiting_input' && !chatMessages.length && !isListening && !isSpeakingRef.current) {
-      speakText(
-        editingMealId
-          ? 'Hands-free mode is on. Tell me how you want to update this meal.'
-          : 'Hands-free mode is on. Tell me what you ate.',
-        () =>
-          startListening(
-            editingMealId ? 'Listening for your edit...' : 'Listening for your meal...'
-          )
-      );
     }
   }, [
     activeDraft,
@@ -316,12 +331,17 @@ export default function LogMealScreen() {
   useSpeechRecognitionEvent('start', () => {
     clearSpeechEndTimeout();
     setIsListening(true);
+    isListeningRef.current = true;
     setLiveTranscript('');
   });
 
   useSpeechRecognitionEvent('result', (event) => {
     const transcript = event.results[0]?.transcript?.trim();
     if (!transcript) return;
+
+    if (isSpeakingRef.current) {
+      Speech.stop().catch(() => undefined);
+    }
 
     latestTranscriptRef.current = transcript;
     setLiveTranscript(transcript);
@@ -339,6 +359,7 @@ export default function LogMealScreen() {
 
   useSpeechRecognitionEvent('error', (event) => {
     setIsListening(false);
+    isListeningRef.current = false;
 
     if (!voiceModeEnabledRef.current) {
       return;
@@ -361,6 +382,7 @@ export default function LogMealScreen() {
   useSpeechRecognitionEvent('end', () => {
     clearSpeechEndTimeout();
     setIsListening(false);
+    isListeningRef.current = false;
 
     const transcript =
       pendingFinalTranscriptRef.current.trim() || latestTranscriptRef.current.trim();
@@ -400,8 +422,10 @@ export default function LogMealScreen() {
 
   const stopVoiceMode = useCallback(() => {
     clearRestartTimeout();
+    clearSpeechEndTimeout();
     shouldResumeListeningRef.current = false;
     pendingFinalTranscriptRef.current = '';
+    latestTranscriptRef.current = '';
     lastClarificationIdRef.current = '';
     activeDraftSignatureRef.current = '';
     setVoiceModeEnabled(false);
@@ -409,9 +433,11 @@ export default function LogMealScreen() {
     setLiveTranscript('');
     setIsSpeaking(false);
     setIsListening(false);
+    isListeningRef.current = false;
+    isSpeakingRef.current = false;
     Speech.stop().catch(() => undefined);
     ExpoSpeechRecognitionModule.abort();
-  }, [clearRestartTimeout]);
+  }, [clearRestartTimeout, clearSpeechEndTimeout]);
 
   const onReset = () => {
     stopVoiceMode();
@@ -440,10 +466,20 @@ export default function LogMealScreen() {
     setVoiceError(null);
     setRecognitionAvailable(true);
     setVoiceModeEnabled(true);
-    setVoiceStatus('Hands-free mode is on.');
+    setVoiceStatus('Listening...');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    void playListeningCue();
+    setTimeout(() => {
+      startListening(editingMealId ? 'Listening for your edit...' : 'Listening for your meal...');
+    }, 50);
   };
 
   async function handleVoiceTranscript(transcript: string) {
+    if (isStopVoiceCommand(transcript)) {
+      stopVoiceMode();
+      return;
+    }
+
     setVoiceError(null);
     setVoiceStatus('Sending...');
     setLiveTranscript(transcript);
@@ -461,17 +497,15 @@ export default function LogMealScreen() {
         if (meal) {
           activeDraftSignatureRef.current = '';
           lastClarificationIdRef.current = '';
-          speakText(`Saved ${meal.title}. Say another meal whenever you're ready.`, () =>
-            startListening('Listening for your next meal...')
-          );
+          startListening('Listening for your next meal...');
+          speakText(`Saved ${meal.title}.`);
         }
         return;
       }
 
       if (command === 'retry') {
-        speakText('Okay. Tell me what to change.', () =>
-          startListening('Listening for your correction...')
-        );
+        startListening('Listening for your correction...');
+        speakText('Okay.');
         return;
       }
     }
@@ -682,20 +716,8 @@ export default function LogMealScreen() {
   );
 }
 
-function buildClarificationPrompt(question: string, options: string[]) {
-  if (options.length === 0) {
-    return question;
-  }
-
-  const spokenOptions = options
-    .filter((option) => option.toLowerCase() !== "other / i'll describe")
-    .slice(0, 3);
-
-  if (spokenOptions.length === 0) {
-    return `${question} You can say your answer naturally.`;
-  }
-
-  return `${question} You can say ${spokenOptions.join(', ')}, or say your own answer.`;
+function buildClarificationPrompt(question: string) {
+  return question;
 }
 
 function buildConfirmationPrompt(activeDraft: MealDraft) {
@@ -709,7 +731,7 @@ function getVoiceConfirmationCommand(transcript: string): 'save' | 'retry' | 'me
   const shortReply = compact.split(/\s+/).filter(Boolean).length <= 4;
 
   if (
-    /\b(save|yes|yep|yeah|correct|looks right|that'?s right|log it|sounds good)\b/.test(compact)
+    /\b(save|safe|saved|yes|yep|yeah|correct|looks right|that'?s right|log it|sounds good)\b/.test(compact)
   ) {
     return 'save';
   }
@@ -722,6 +744,11 @@ function getVoiceConfirmationCommand(transcript: string): 'save' | 'retry' | 'me
   }
 
   return 'message';
+}
+
+function isStopVoiceCommand(transcript: string) {
+  const compact = transcript.trim().toLowerCase().replace(/[^\w\s]/g, ' ');
+  return /\b(stop|stop listening|be quiet|quiet|cancel voice|turn off voice|mute)\b/.test(compact);
 }
 
 const styles = StyleSheet.create({
