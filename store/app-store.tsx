@@ -1,4 +1,4 @@
-import { PropsWithChildren, createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 
 import {
@@ -9,7 +9,9 @@ import {
   MealEntry,
   MealInterpretationResponse,
 } from '@/models/domain';
+import { useAuth } from '@/context/auth-context';
 import { GroqMessage, interpretMealWithGroq } from '@/services/meal-interpreter';
+import { fetchGoals, fetchMeals, fetchNotes, saveMeal, saveGoals, saveNote } from '@/services/firestore';
 
 export type MacroGoals = {
   calories: number;
@@ -64,6 +66,9 @@ function makeChatMessage(message: Omit<ChatMessage, 'id' | 'createdAt'>): ChatMe
 }
 
 export function AppStoreProvider({ children }: PropsWithChildren) {
+  const { user } = useAuth();
+  const uid = user?.uid ?? null;
+
   const [meals, setMeals] = useState<MealEntry[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatStatus, setChatStatus] = useState<ChatSessionStatus>('awaiting_input');
@@ -76,6 +81,19 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const [dateNotes, setDateNotes] = useState<Record<string, string>>({});
   const [macroGoals, setMacroGoalsState] = useState<MacroGoals>(DEFAULT_MACRO_GOALS);
 
+  // Load all user data from Firestore when the user logs in
+  useEffect(() => {
+    if (!uid) {
+      setMeals([]);
+      setDateNotes({});
+      setMacroGoalsState(DEFAULT_MACRO_GOALS);
+      return;
+    }
+    fetchMeals(uid).then(setMeals).catch(console.error);
+    fetchGoals(uid).then((goals) => { if (goals) setMacroGoalsState(goals); }).catch(console.error);
+    fetchNotes(uid).then(setDateNotes).catch(console.error);
+  }, [uid]);
+
   const setMacroGoals = useCallback((updates: Partial<MacroGoals>) => {
     setMacroGoalsState((prev) => {
       const next = { ...prev };
@@ -83,9 +101,10 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         const v = updates[key];
         if (typeof v === 'number' && v >= 0) next[key] = Math.round(v);
       });
+      if (uid) saveGoals(uid, next).catch(console.error);
       return next;
     });
-  }, []);
+  }, [uid]);
 
   const setDateNote = useCallback((dateKey: string, note: string) => {
     setDateNotes((prev) => {
@@ -93,9 +112,10 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       const trimmed = note.trim();
       if (trimmed) next[dateKey] = trimmed;
       else delete next[dateKey];
+      if (uid) saveNote(uid, dateKey, note).catch(console.error);
       return next;
     });
-  }, []);
+  }, [uid]);
 
   const sessionHistoryRef = useRef<GroqMessage[]>([]);
 
@@ -204,6 +224,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         setMeals((prev) => [meal, ...prev]);
       }
 
+      if (uid) saveMeal(uid, meal).catch(console.error);
+
       const shouldResetChatSession = Boolean(options?.resetChatSessionAfterSave);
 
       setPendingInterpretation(null);
@@ -220,13 +242,13 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       return meal;
     },
-    [activeDraft, pendingInterpretation, editingMealId]
+    [activeDraft, pendingInterpretation, editingMealId, uid]
   );
 
   const editMeal = useCallback(
     (id: string, updates: { title?: string; calories: number; protein: number; carbs: number; fat: number }) => {
-      setMeals((prev) =>
-        prev.map((m) =>
+      setMeals((prev) => {
+        const next = prev.map((m) =>
           m.id === id
             ? {
                 ...m,
@@ -234,10 +256,15 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
                 components: scaleMealComponents(m.components, m, updates),
               }
             : m
-        )
-      );
+        );
+        if (uid) {
+          const updated = next.find((m) => m.id === id);
+          if (updated) saveMeal(uid, updated).catch(console.error);
+        }
+        return next;
+      });
     },
-    []
+    [uid]
   );
 
   const startEditSession = useCallback(

@@ -1,9 +1,10 @@
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Layout } from '@/constants/theme';
+import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getWeeklyMacroSummaries } from '@/services/macro-aggregation';
 import { useAppStore } from '@/store/app-store';
@@ -19,6 +20,8 @@ function parsePositiveInt(s: string): number | null {
 
 export default function MyMacrosScreen() {
   const { meals, macroGoals, setMacroGoals } = useAppStore();
+  const { signOut, user } = useAuth();
+  const email = user?.email ?? '';
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -126,6 +129,13 @@ export default function MyMacrosScreen() {
             </ThemedText>
           </ThemedView>
         </ThemedView>
+
+        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+          <ThemedText style={[styles.accountEmail, { color: theme.tabIconDefault }]}>{email}</ThemedText>
+          <Pressable style={[styles.signOutButton, { borderColor: theme.cardBorder }]} onPress={signOut}>
+            <ThemedText style={styles.signOutText}>Sign out</ThemedText>
+          </Pressable>
+        </ThemedView>
       </View>
     </ScrollView>
   );
@@ -212,5 +222,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
     borderRadius: 12,
+  },
+  accountEmail: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  signOutButton: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  signOutText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#e53e3e',
   },
 });

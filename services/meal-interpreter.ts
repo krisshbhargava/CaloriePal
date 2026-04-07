@@ -77,26 +77,32 @@ export async function interpretMealWithGroq(
     throw new Error('EXPO_PUBLIC_GROQ_API_KEY is not set in your .env file. Add your xAI key.');
   }
 
-  const response = await fetch(XAI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: XAI_MODEL,
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...sessionHistory],
-      temperature: 0.3,
-      max_tokens: 768,
-    }),
+  const body = JSON.stringify({
+    model: XAI_MODEL,
+    messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...sessionHistory],
+    temperature: 0.3,
+    max_tokens: 768,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`xAI API error ${response.status}: ${errorText}`);
+  let response: Response | null = null;
+  let lastError = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1500 * attempt));
+    response = await fetch(XAI_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body,
+    });
+    if (response.ok) break;
+    lastError = await response.text();
+    if (response.status !== 503) break; // only retry on 503
   }
 
-  const data = await response.json();
+  if (!response!.ok) {
+    throw new Error(`xAI API error ${response!.status}: ${lastError}`);
+  }
+
+  const data = await response!.json();
   const rawContent: string = data.choices?.[0]?.message?.content ?? '';
   const cleaned = rawContent.replace(/```(?:json)?/g, '').trim();
 
