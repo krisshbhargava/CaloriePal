@@ -1,5 +1,6 @@
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MealEntry } from '@/models/domain';
@@ -7,15 +8,17 @@ import { MealEntry } from '@/models/domain';
 type Props = {
   meal: MealEntry | null;
   onDone: () => void;
+  enabled?: boolean;
 };
 
-export function MealSummaryModal({ meal, onDone }: Props) {
-  if (!meal) return null;
+export function MealSummaryModal({ meal, onDone, enabled = true }: Props) {
+  if (!meal || !enabled) return null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onDone}>
       <View style={styles.overlay}>
         <ThemedView style={styles.card}>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.checkRow}>
             <View style={styles.checkCircle}>
               <ThemedText style={styles.checkIcon}>✓</ThemedText>
@@ -36,6 +39,8 @@ export function MealSummaryModal({ meal, onDone }: Props) {
             <MacroPill label="Fat" value={meal.fat} />
           </View>
 
+          <MealBreakdownList components={meal.components} />
+
           {meal.assumptions.length > 0 && (
             <View style={styles.assumptions}>
               <ThemedText style={styles.assumptionsLabel}>Assumptions</ThemedText>
@@ -48,6 +53,7 @@ export function MealSummaryModal({ meal, onDone }: Props) {
           <Pressable style={styles.doneBtn} onPress={onDone}>
             <ThemedText style={styles.doneBtnText}>Done</ThemedText>
           </Pressable>
+          </ScrollView>
         </ThemedView>
       </View>
     </Modal>
@@ -74,8 +80,14 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
+    maxHeight: '80%',
     borderRadius: 24,
-    padding: 24,
+    padding: 20,
+  },
+  scroll: {
+    width: '100%',
+  },
+  scrollContent: {
     gap: 16,
     alignItems: 'center',
   },

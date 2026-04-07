@@ -7,6 +7,15 @@ export type MacroEstimate = {
   fat: number;
 };
 
+export type MealComponent = {
+  name: string;
+  quantity: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
+
 export type MealEntry = {
   id: string;
   title: string;
@@ -14,6 +23,7 @@ export type MealEntry = {
   timestamp: string;
   confidence: number;
   assumptions: string[];
+  components: MealComponent[];
   source: MealSource;
 } & MacroEstimate;
 
@@ -45,6 +55,7 @@ export type MealInterpretationResponse = {
   clarificationQuestion?: string;
   clarificationOptions?: string[];
   estimatedMacros?: MacroEstimate;
+  components?: MealComponent[];
   confidence: number;
   assumptions: string[];
   matchedFoods?: string[];
@@ -54,6 +65,7 @@ export type MealDraft = {
   sourceText: string;
   mealTitle: string;
   estimatedMacros: MacroEstimate;
+  components: MealComponent[];
   confidence: number;
   assumptions: string[];
 };

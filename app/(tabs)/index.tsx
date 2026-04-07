@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EditMealModal } from '@/components/edit-meal-modal';
+import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Layout } from '@/constants/theme';
@@ -130,6 +131,7 @@ export default function DashboardScreen() {
                   <ThemedText style={styles.mealMacros}>
                     {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fat}g
                   </ThemedText>
+                  <MealBreakdownList components={meal.components} compact />
                 </Pressable>
               ))
             )}

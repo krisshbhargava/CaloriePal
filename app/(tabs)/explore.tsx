@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { Colors, Fonts, Layout } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getDateKey } from '@/services/macro-aggregation';
@@ -211,6 +212,7 @@ export default function ExploreCalendarScreen() {
                 <ThemedText>
                   {meal.calories} kcal • P {meal.protein} • C {meal.carbs} • F {meal.fat}
                 </ThemedText>
+                <MealBreakdownList components={meal.components} compact />
               </ThemedView>
             ))
           )}
