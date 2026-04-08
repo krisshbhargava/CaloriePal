@@ -12,6 +12,12 @@ import {
 import { useAuth } from '@/context/auth-context';
 import { GroqMessage, interpretMealWithGroq } from '@/services/meal-interpreter';
 import { fetchGoals, fetchMeals, fetchNotes, saveMeal, saveGoals, saveNote } from '@/services/firestore';
+import {
+  trackClarificationNeeded,
+  trackMealLogAbandoned,
+  trackMealLogCompleted,
+  trackMealLogStarted,
+} from '@/services/analytics';
 
 export type MacroGoals = {
   calories: number;
@@ -40,7 +46,7 @@ type AppStateContextValue = {
   dateNotes: Record<string, string>;
   macroGoals: MacroGoals;
   setMacroGoals: (updates: Partial<MacroGoals>) => void;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, inputMethod?: 'text' | 'voice') => Promise<void>;
   saveMealFromInterpretation: (
     description: string,
     options?: {
@@ -118,15 +124,25 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   }, [uid]);
 
   const sessionHistoryRef = useRef<GroqMessage[]>([]);
+  const sessionStartTimeRef = useRef<number | null>(null);
+  const sessionInputMethodRef = useRef<'text' | 'voice'>('text');
+  const clarificationTurnsRef = useRef<number>(0);
 
   const appendChatMessage = useCallback((message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
     setChatMessages((prev) => [...prev, makeChatMessage(message)]);
   }, []);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, inputMethod: 'text' | 'voice' = 'text') => {
       const trimmed = text.trim();
       if (!trimmed || isInterpreting) return;
+
+      // Track session start on first message
+      if (sessionHistoryRef.current.length === 0) {
+        sessionStartTimeRef.current = Date.now();
+        sessionInputMethodRef.current = inputMethod;
+        trackMealLogStarted(inputMethod);
+      }
 
       setChatError(null);
       setIsInterpreting(true);
@@ -146,6 +162,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
             ...sessionHistoryRef.current,
             { role: 'assistant', content: question },
           ];
+          clarificationTurnsRef.current += 1;
+          trackClarificationNeeded(clarificationTurnsRef.current);
           setActiveDraft(null);
           setChatStatus('awaiting_clarification');
         } else {
@@ -225,6 +243,18 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       }
 
       if (uid) saveMeal(uid, meal).catch(console.error);
+
+      const durationSeconds = sessionStartTimeRef.current
+        ? Math.round((Date.now() - sessionStartTimeRef.current) / 1000)
+        : 0;
+      trackMealLogCompleted({
+        durationSeconds,
+        clarificationTurns: clarificationTurnsRef.current,
+        inputMethod: sessionInputMethodRef.current,
+        calories: meal.calories,
+      });
+      sessionStartTimeRef.current = null;
+      clarificationTurnsRef.current = 0;
 
       const shouldResetChatSession = Boolean(options?.resetChatSessionAfterSave);
 
@@ -318,6 +348,12 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   }, []);
 
   const resetChatSession = useCallback(() => {
+    if (activeDraft !== null || pendingInterpretation !== null) {
+      trackMealLogAbandoned();
+    }
+    sessionStartTimeRef.current = null;
+    clarificationTurnsRef.current = 0;
+    sessionInputMethodRef.current = 'text';
     setPendingInterpretation(null);
     setActiveDraft(null);
     setChatError(null);
@@ -326,7 +362,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     setEditingMealId(null);
     sessionHistoryRef.current = [];
     setChatMessages([]);
-  }, []);
+  }, [activeDraft, pendingInterpretation]);
 
   const value = useMemo<AppStateContextValue>(
     () => ({

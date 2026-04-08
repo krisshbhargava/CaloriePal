@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/context/auth-context';
+import { RemoteConfigProvider } from '@/context/remote-config-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppStoreProvider } from '@/store/app-store';
 
@@ -52,9 +53,11 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppStoreProvider>
-          <RootNavigator />
-        </AppStoreProvider>
+        <RemoteConfigProvider>
+          <AppStoreProvider>
+            <RootNavigator />
+          </AppStoreProvider>
+        </RemoteConfigProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

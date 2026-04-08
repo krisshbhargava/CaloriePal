@@ -24,8 +24,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TypingDots } from '@/components/typing-dots';
 import { Colors } from '@/constants/theme';
+import { useRemoteConfig } from '@/context/remote-config-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ChatSessionStatus, MealDraft } from '@/models/domain';
+import { trackVoiceModeToggled } from '@/services/analytics';
+import { endUserSession } from '@/services/local-ab-tracker';
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
@@ -50,6 +53,7 @@ export default function LogMealScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
+  const { showEnhancedSummary, showMealBreakdown } = useRemoteConfig();
 
   const [draft, setDraft] = useState('');
   const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
@@ -408,11 +412,11 @@ export default function LogMealScreen() {
     if (!canSubmit) return;
     const text = draft.trim();
     setDraft('');
-    await sendMessage(text);
+    await sendMessage(text, 'text');
   };
 
   const onSelectOption = async (option: string) => {
-    await sendMessage(option);
+    await sendMessage(option, 'text');
   };
 
   const onSave = () => {
@@ -429,6 +433,7 @@ export default function LogMealScreen() {
     lastClarificationIdRef.current = '';
     activeDraftSignatureRef.current = '';
     setVoiceModeEnabled(false);
+    trackVoiceModeToggled(false);
     setVoiceStatus('Hands-free is off.');
     setLiveTranscript('');
     setIsSpeaking(false);
@@ -466,6 +471,7 @@ export default function LogMealScreen() {
     setVoiceError(null);
     setRecognitionAvailable(true);
     setVoiceModeEnabled(true);
+    trackVoiceModeToggled(true);
     setVoiceStatus('Listening...');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     void playListeningCue();
@@ -510,7 +516,7 @@ export default function LogMealScreen() {
       }
     }
 
-    await sendMessage(transcript);
+    await sendMessage(transcript, 'voice');
   }
 
   return (
@@ -518,8 +524,14 @@ export default function LogMealScreen() {
       <MealSummaryModal
         meal={lastSavedMeal}
         onDone={clearLastSavedMeal}
-        enabled={!voiceModeEnabled}
+        enabled={!voiceModeEnabled && showEnhancedSummary}
       />
+      {!showEnhancedSummary && !!lastSavedMeal && (
+        <SimpleToast
+          message={`Saved: ${lastSavedMeal.title} — ${lastSavedMeal.calories} kcal`}
+          onDismiss={clearLastSavedMeal}
+        />
+      )}
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -542,6 +554,21 @@ export default function LogMealScreen() {
                 Tell me what you ate and I&apos;ll only ask follow-up questions when a missing
                 detail could meaningfully change the estimate.
               </ThemedText>
+              {__DEV__ && (
+                <Pressable
+                  onPress={() => { endUserSession().catch(() => {}); }}
+                  style={({ pressed }) => ({
+                    marginTop: 24,
+                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#999',
+                    opacity: pressed ? 0.5 : 1,
+                  })}>
+                  <ThemedText style={{ fontSize: 13, color: '#999' }}>Next User (Dev)</ThemedText>
+                </Pressable>
+              )}
             </View>
           ) : (
             chatMessages.map((msg) => (
@@ -642,7 +669,7 @@ export default function LogMealScreen() {
                 F
               </ThemedText>
             </View>
-            <MealBreakdownList components={activeDraft.components} compact />
+            {showMealBreakdown && <MealBreakdownList components={activeDraft.components} compact />}
             <View style={styles.actionButtons}>
               <Pressable
                 style={[styles.actionBtn, styles.saveBtn, { backgroundColor: theme.primary }]}
@@ -715,6 +742,43 @@ export default function LogMealScreen() {
     </>
   );
 }
+
+function SimpleToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 2000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <View style={toastStyles.container} pointerEvents="none">
+      <View style={toastStyles.toast}>
+        <ThemedText style={toastStyles.text}>{message}</ThemedText>
+      </View>
+    </View>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 120,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  toast: {
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  text: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+});
 
 function buildClarificationPrompt(question: string) {
   return question;

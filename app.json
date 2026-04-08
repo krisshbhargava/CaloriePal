@@ -15,7 +15,8 @@
         "NSMicrophoneUsageDescription": "Allow Chronobite to listen so you can log meals hands-free.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.redlog.chronobite"
+      "bundleIdentifier": "com.redlog.chronobite",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +29,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "package": "com.redlog.chronobite"
     },
     "web": {
       "output": "static",
@@ -54,7 +56,8 @@
           "microphonePermission": "Allow Chronobite to listen so you can log meals hands-free.",
           "speechRecognitionPermission": "Allow Chronobite to transcribe what you say for hands-free meal logging."
         }
-      ]
+      ],
+      "@react-native-firebase/app"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -63,8 +66,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "b1848d9f-57b5-4b56-b738-ff73f3bdf728"
+        "projectId": "868c265b-3265-466d-a9d7-31170a1faae8"
       }
-    }
+    },
+    "owner": "kbhargava"
   }
 }
