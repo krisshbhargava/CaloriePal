@@ -5,8 +5,6 @@ import {
   getShowEnhancedSummary,
   getShowMealBreakdown,
 } from '@/services/remote-config';
-import { getOrAssignVariant, initABTracker, printABSummary } from '@/services/local-ab-tracker';
-
 type RemoteConfigContextValue = {
   showEnhancedSummary: boolean;
   showMealBreakdown: boolean;
@@ -38,10 +36,6 @@ export function RemoteConfigProvider({ children }: PropsWithChildren) {
         // Defaults stay in place — app continues normally
       });
 
-    if (__DEV__) {
-      initABTracker();
-      printABSummary();
-    }
   }, []);
 
   return (

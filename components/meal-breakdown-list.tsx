@@ -53,25 +53,26 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Nunito_700Bold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   item: {
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 16,
+    padding: 12,
     gap: 4,
-    borderWidth: 1,
   },
   itemCompact: {
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   itemTitle: {
     fontSize: 13,
+    fontFamily: 'Nunito_600SemiBold',
   },
   itemMacros: {
     fontSize: 12,
     opacity: 0.9,
     lineHeight: 18,
+    fontFamily: 'Nunito_400Regular',
   },
 });

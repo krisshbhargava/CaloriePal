@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { RaisedPressable } from '@/components/raised-pressable';
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Colors, Fonts, Shadows } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 
 type Props = {
@@ -13,12 +17,14 @@ type Props = {
 };
 
 export function EditMealModal({ meal, onClose, onSaveManual, onEditWithAI }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
 
-  // Reset fields whenever a new meal opens
   const handleOpen = () => {
     if (meal) {
       setCalories(String(meal.calories));
@@ -56,8 +62,7 @@ export function EditMealModal({ meal, onClose, onSaveManual, onEditWithAI }: Pro
       onShow={handleOpen}
     >
       <View style={styles.overlay}>
-        <ThemedView style={styles.sheet}>
-          {/* Header */}
+        <ThemedView style={[styles.sheet, Shadows.modal]}>
           <View style={styles.header}>
             <View>
               <ThemedText type="defaultSemiBold" style={styles.editingLabel}>Editing</ThemedText>
@@ -68,32 +73,29 @@ export function EditMealModal({ meal, onClose, onSaveManual, onEditWithAI }: Pro
             </Pressable>
           </View>
 
-          {/* AI Edit option */}
-          <Pressable style={styles.aiBtn} onPress={handleEditWithAI}>
-            <ThemedText style={styles.aiBtnText}>✦  Edit with AI</ThemedText>
-            <ThemedText style={styles.aiBtnSub}>Describe what changed — AI will recalculate</ThemedText>
-          </Pressable>
+          <RaisedPressable style={[styles.aiBtn, { backgroundColor: theme.primaryMuted, borderColor: theme.primary }]} onPress={handleEditWithAI} shadowColor={theme.primary}>
+            <ThemedText style={[styles.aiBtnText, { color: theme.primary }]}>✦  Edit with AI</ThemedText>
+            <ThemedText style={[styles.aiBtnSub, { color: theme.primary }]}>Describe what changed — AI will recalculate</ThemedText>
+          </RaisedPressable>
 
-          {/* Divider */}
           <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: theme.cardBorder }]} />
             <ThemedText style={styles.dividerLabel}>or edit manually</ThemedText>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: theme.cardBorder }]} />
           </View>
 
-          {/* Manual fields */}
           <View style={styles.fields}>
-            <MacroField label="Calories (kcal)" value={calories} onChange={setCalories} />
+            <MacroField label="Calories (kcal)" value={calories} onChange={setCalories} theme={theme} />
             <View style={styles.fieldRow}>
-              <MacroField label="Protein (g)" value={protein} onChange={setProtein} flex />
-              <MacroField label="Carbs (g)" value={carbs} onChange={setCarbs} flex />
-              <MacroField label="Fat (g)" value={fat} onChange={setFat} flex />
+              <MacroField label="Protein (g)" value={protein} onChange={setProtein} flex theme={theme} />
+              <MacroField label="Carbs (g)" value={carbs} onChange={setCarbs} flex theme={theme} />
+              <MacroField label="Fat (g)" value={fat} onChange={setFat} flex theme={theme} />
             </View>
           </View>
 
-          <Pressable style={styles.saveBtn} onPress={handleSave}>
+          <RaisedPressable style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleSave}>
             <ThemedText style={styles.saveBtnText}>Save Changes</ThemedText>
-          </Pressable>
+          </RaisedPressable>
         </ThemedView>
       </View>
     </Modal>
@@ -105,11 +107,13 @@ function MacroField({
   value,
   onChange,
   flex,
+  theme,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   flex?: boolean;
+  theme: typeof Colors['light'];
 }) {
   return (
     <View style={[styles.fieldWrapper, flex && styles.fieldFlex]}>
@@ -118,7 +122,7 @@ function MacroField({
         value={value}
         onChangeText={onChange}
         keyboardType="numeric"
-        style={styles.fieldInput}
+        style={[styles.fieldInput, { borderColor: theme.cardBorder, color: theme.text, backgroundColor: theme.surface }]}
         selectTextOnFocus
       />
     </View>
@@ -132,8 +136,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 24,
     gap: 16,
     paddingBottom: 40,
@@ -154,25 +158,23 @@ const styles = StyleSheet.create({
   },
   closeBtnText: {
     fontSize: 18,
-    opacity: 0.4,
+    opacity: 0.6,
+    fontFamily: Fonts.bold,
   },
   aiBtn: {
-    backgroundColor: '#F0F6FF',
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#007AFF',
-    padding: 14,
+    padding: 16,
     gap: 4,
   },
   aiBtnText: {
-    color: '#007AFF',
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
     fontSize: 15,
   },
   aiBtnSub: {
-    color: '#007AFF',
     opacity: 0.7,
     fontSize: 13,
+    fontFamily: Fonts.regular,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -182,11 +184,11 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#CCC',
   },
   dividerLabel: {
     fontSize: 12,
     opacity: 0.5,
+    fontFamily: Fonts.regular,
   },
   fields: {
     gap: 10,
@@ -204,26 +206,24 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 12,
     opacity: 0.5,
-    fontWeight: '500',
+    fontFamily: Fonts.regular,
   },
   fieldInput: {
     borderWidth: 1,
-    borderColor: '#CCC',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: Fonts.semiBold,
   },
   saveBtn: {
-    backgroundColor: '#007AFF',
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderRadius: 999,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   saveBtnText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
+    fontFamily: Fonts.bold,
+    fontSize: 17,
   },
 });

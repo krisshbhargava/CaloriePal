@@ -1,71 +1,83 @@
-/**
- * App color scheme and typography.
- * Primary: #ffbb39, Accent: #083c5d, Text: #1d2731, Background: white.
- */
-
-import { Platform } from 'react-native';
-
-const primary = '#ffbb39';
-const accent = '#083c5d';
-const textPrimary = '#1d2731';
-const white = '#ffffff';
-
 export const Colors = {
   light: {
-    text: textPrimary,
-    background: white,
-    primary,
-    accent,
-    card: white,
-    cardBorder: '#e8eaed',
-    surface: '#f5f6f8',
-    tint: primary,
-    icon: textPrimary,
-    tabIconDefault: '#6b7280',
-    tabIconSelected: primary,
-    link: accent,
+    text: '#1A1A2E',
+    textMuted: '#6B7280',
+    background: '#FAFBFF',
+    surface: '#F1F3FB',
+    card: '#FFFFFF',
+    primary: '#6366F1',
+    primaryMuted: '#EEF2FF',
+    accent: '#4F46E5',
+    cardBorder: '#E2E5F5',
+    tint: '#6366F1',
+    icon: '#1A1A2E',
+    tabIconDefault: '#9CA3AF',
+    tabIconSelected: '#6366F1',
+    link: '#6366F1',
+    error: '#EF4444',
+    errorSurface: '#FEF2F2',
+    success: '#10B981',
+    successSurface: '#ECFDF5',
   },
   dark: {
-    text: '#e8eaed',
-    background: '#111318',
-    primary,
-    accent: '#5b9fd4',
-    card: '#1d2731',
-    cardBorder: '#2d3748',
-    surface: '#1d2731',
-    tint: primary,
-    icon: '#e8eaed',
-    tabIconDefault: '#9ca3af',
-    tabIconSelected: primary,
-    link: '#5b9fd4',
+    text: '#E8E8F5',
+    textMuted: '#9CA3AF',
+    background: '#0F0F1A',
+    surface: '#1A1A2E',
+    card: '#16162A',
+    primary: '#818CF8',
+    primaryMuted: '#1E1B4B',
+    accent: '#6366F1',
+    cardBorder: '#2D2D4A',
+    tint: '#818CF8',
+    icon: '#E8E8F5',
+    tabIconDefault: '#6B7280',
+    tabIconSelected: '#818CF8',
+    link: '#818CF8',
+    error: '#F87171',
+    errorSurface: '#2D1B1B',
+    success: '#34D399',
+    successSurface: '#022C22',
+  },
+  macro: {
+    calories: '#6366F1',
+    protein: '#10B981',
+    carbs: '#F59E0B',
+    fat: '#F43F5E',
   },
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    sans: 'system-ui',
-    serif: 'ui-serif',
-    rounded: 'ui-rounded',
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const Fonts = {
+  regular: 'Nunito_400Regular',
+  semiBold: 'Nunito_600SemiBold',
+  bold: 'Nunito_700Bold',
+  extraBold: 'Nunito_800ExtraBold',
+};
 
-/** Max content width for centered, readable layout on large screens */
 export const Layout = {
   maxContentWidth: 480,
   screenPadding: 20,
   cardPadding: 16,
   sectionGap: 20,
+  borderRadiusSM: 12,
+  borderRadiusMD: 20,
+  borderRadiusLG: 28,
+  borderRadiusFull: 999,
+};
+
+export const Shadows = {
+  card: {
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  modal: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 12,
+  },
 };

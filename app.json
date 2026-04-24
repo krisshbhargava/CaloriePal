@@ -33,8 +33,14 @@
       "package": "com.redlog.chronobite"
     },
     "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "CaloriePal",
+      "shortName": "CaloriePal",
+      "description": "AI-powered calorie and macro tracking. Log meals by describing what you ate.",
+      "themeColor": "#6366F1",
+      "backgroundColor": "#FAFBFF"
     },
     "plugins": [
       "expo-router",

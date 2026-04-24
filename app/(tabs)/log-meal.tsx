@@ -20,15 +20,15 @@ import * as Haptics from 'expo-haptics';
 
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { MealSummaryModal } from '@/components/meal-summary-modal';
+import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TypingDots } from '@/components/typing-dots';
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 import { useRemoteConfig } from '@/context/remote-config-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ChatSessionStatus, MealDraft } from '@/models/domain';
 import { trackVoiceModeToggled } from '@/services/analytics';
-import { endUserSession } from '@/services/local-ab-tracker';
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
@@ -554,21 +554,6 @@ export default function LogMealScreen() {
                 Tell me what you ate and I&apos;ll only ask follow-up questions when a missing
                 detail could meaningfully change the estimate.
               </ThemedText>
-              {__DEV__ && (
-                <Pressable
-                  onPress={() => { endUserSession().catch(() => {}); }}
-                  style={({ pressed }) => ({
-                    marginTop: 24,
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: '#999',
-                    opacity: pressed ? 0.5 : 1,
-                  })}>
-                  <ThemedText style={{ fontSize: 13, color: '#999' }}>Next User (Dev)</ThemedText>
-                </Pressable>
-              )}
             </View>
           ) : (
             chatMessages.map((msg) => (
@@ -599,15 +584,15 @@ export default function LogMealScreen() {
                   key={option}
                   style={({ pressed }) => [
                     styles.chip,
-                    { borderColor: theme.accent, backgroundColor: theme.surface },
-                    pressed && { backgroundColor: theme.accent },
+                    { borderColor: theme.primary, backgroundColor: theme.surface },
+                    pressed && { backgroundColor: theme.primary },
                   ]}
                   onPress={() => onSelectOption(option)}>
                   {({ pressed }) => (
                     <ThemedText
                       style={[
                         styles.chipText,
-                        { color: pressed ? theme.background : theme.accent },
+                        { color: pressed ? theme.background : theme.primary },
                       ]}>
                       {option}
                     </ThemedText>
@@ -636,7 +621,7 @@ export default function LogMealScreen() {
               {!!liveTranscript && (
                 <ThemedText style={styles.voiceTranscript}>&quot;{liveTranscript}&quot;</ThemedText>
               )}
-              {!!voiceError && <ThemedText style={styles.voiceError}>{voiceError}</ThemedText>}
+              {!!voiceError && <ThemedText style={[styles.voiceError, { color: theme.error }]}>{voiceError}</ThemedText>}
             </ThemedView>
           )}
 
@@ -653,8 +638,8 @@ export default function LogMealScreen() {
           )}
 
           {!!chatError && (
-            <ThemedView style={[styles.errorBanner, { backgroundColor: '#FEF2F2' }]}>
-              <ThemedText style={styles.errorText}>{chatError}</ThemedText>
+            <ThemedView style={[styles.errorBanner, { backgroundColor: theme.errorSurface }]}>
+              <ThemedText style={[styles.errorText, { color: theme.error }]}>{chatError}</ThemedText>
             </ThemedView>
           )}
         </ScrollView>
@@ -671,13 +656,13 @@ export default function LogMealScreen() {
             </View>
             {showMealBreakdown && <MealBreakdownList components={activeDraft.components} compact />}
             <View style={styles.actionButtons}>
-              <Pressable
+              <RaisedPressable
                 style={[styles.actionBtn, styles.saveBtn, { backgroundColor: theme.primary }]}
                 onPress={onSave}>
-                <ThemedText style={[styles.saveBtnText, { color: theme.accent }]}> 
+                <ThemedText style={[styles.saveBtnText, { color: '#fff' }]}>
                   {editingMealId ? 'Save Changes' : 'Save Meal'}
                 </ThemedText>
-              </Pressable>
+              </RaisedPressable>
               <Pressable
                 style={[styles.actionBtn, { borderColor: theme.cardBorder }]}
                 onPress={onReset}>
@@ -703,7 +688,7 @@ export default function LogMealScreen() {
             onSubmitEditing={onSend}
             editable={!isInterpreting}
           />
-          <Pressable
+          <RaisedPressable
             style={[
               styles.voiceBtn,
               {
@@ -711,14 +696,15 @@ export default function LogMealScreen() {
                 borderColor: theme.cardBorder,
               },
             ]}
+            shadowColor={voiceModeEnabled ? theme.accent : theme.primary}
             onPress={() => void toggleVoiceMode()}>
             <MaterialIcons
               name={voiceModeEnabled ? 'mic' : 'mic-none'}
               size={22}
               color={voiceModeEnabled ? theme.background : theme.text}
             />
-          </Pressable>
-          <Pressable
+          </RaisedPressable>
+          <RaisedPressable
             style={[
               styles.sendBtn,
               { backgroundColor: theme.primary },
@@ -726,8 +712,8 @@ export default function LogMealScreen() {
             ]}
             onPress={onSend}
             disabled={!canSubmit}>
-            <ThemedText style={[styles.sendBtnText, { color: theme.accent }]}>↑</ThemedText>
-          </Pressable>
+            <ThemedText style={[styles.sendBtnText, { color: '#fff' }]}>↑</ThemedText>
+          </RaisedPressable>
         </ThemedView>
 
         {recognitionAvailable === false && (
@@ -768,7 +754,7 @@ const toastStyles = StyleSheet.create({
     zIndex: 999,
   },
   toast: {
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(15,15,26,0.85)',
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 10,
@@ -776,7 +762,7 @@ const toastStyles = StyleSheet.create({
   text: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: Fonts.semiBold,
   },
 });
 
@@ -836,9 +822,9 @@ const styles = StyleSheet.create({
   emptyHint: { textAlign: 'center', opacity: 0.6, lineHeight: 22 },
   bubble: {
     maxWidth: '80%',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   bubbleUser: {
     alignSelf: 'flex-end',
@@ -858,14 +844,14 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   chip: {
-    borderRadius: 20,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1.5,
   },
-  chipText: { fontSize: 14, fontWeight: '500' },
+  chipText: { fontSize: 14, fontFamily: Fonts.semiBold },
   voiceCard: {
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
     padding: 12,
     gap: 6,
@@ -878,7 +864,7 @@ const styles = StyleSheet.create({
   },
   voiceBadge: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: Fonts.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -891,11 +877,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   voiceError: {
-    color: '#B00020',
     fontSize: 13,
   },
-  errorBanner: { borderRadius: 10, padding: 12 },
-  errorText: { color: '#B00020', fontSize: 13 },
+  errorBanner: { borderRadius: 12, padding: 12 },
+  errorText: { fontSize: 13 },
   actionBar: {
     padding: 12,
     gap: 8,
@@ -905,13 +890,13 @@ const styles = StyleSheet.create({
   macroText: { opacity: 0.7, fontSize: 13 },
   actionButtons: { flexDirection: 'row', gap: 8 },
   actionBtn: {
-    borderRadius: 10,
+    borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
   },
   saveBtn: { borderWidth: 0 },
-  saveBtnText: { fontWeight: '600' },
+  saveBtnText: { fontFamily: Fonts.bold },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -922,10 +907,11 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
+    fontFamily: Fonts.regular,
     maxHeight: 100,
   },
   voiceBtn: {
@@ -938,7 +924,7 @@ const styles = StyleSheet.create({
   },
   voiceBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: Fonts.bold,
   },
   sendBtn: {
     width: 40,
@@ -948,7 +934,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnDisabled: {},
-  sendBtnText: { fontSize: 18, fontWeight: '700' },
+  sendBtnText: { fontSize: 18, fontFamily: Fonts.bold },
   devBuildHint: {
     paddingHorizontal: 12,
     paddingVertical: 10,

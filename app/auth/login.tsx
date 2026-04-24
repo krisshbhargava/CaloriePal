@@ -11,8 +11,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -75,22 +76,23 @@ export default function LoginScreen() {
             onSubmitEditing={handleLogin}
           />
 
-          {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+          {error ? <ThemedText style={[styles.error, { color: theme.error }]}>{error}</ThemedText> : null}
 
-          <Pressable
+          <RaisedPressable
             style={[styles.button, { backgroundColor: theme.accent }]}
             onPress={handleLogin}
-            disabled={loading}>
+            disabled={loading}
+            shadowColor={theme.accent}>
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <ThemedText style={styles.buttonText}>Log in</ThemedText>
             )}
-          </Pressable>
+          </RaisedPressable>
 
           <Pressable onPress={() => router.replace('/auth/signup')}>
             <ThemedText style={[styles.switchText, { color: theme.tabIconDefault }]}>
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <ThemedText style={[styles.switchLink, { color: theme.accent }]}>Sign up</ThemedText>
             </ThemedText>
           </Pressable>
@@ -123,43 +125,45 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   appName: {
-    fontSize: 40,
-    fontWeight: 'bold',
+    fontSize: 44,
   },
   tagline: {
     fontSize: 16,
+    fontFamily: Fonts.regular,
   },
   form: {
-    gap: 14,
+    gap: 16,
   },
   input: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 999,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     fontSize: 16,
+    fontFamily: Fonts.regular,
   },
   error: {
-    color: '#e53e3e',
     fontSize: 14,
     textAlign: 'center',
+    fontFamily: Fonts.regular,
   },
   button: {
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: 999,
+    paddingVertical: 18,
     alignItems: 'center',
     marginTop: 4,
   },
   buttonText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
+    fontFamily: Fonts.bold,
+    fontSize: 17,
   },
   switchText: {
     textAlign: 'center',
     fontSize: 14,
+    fontFamily: Fonts.regular,
   },
   switchLink: {
-    fontWeight: '600',
+    fontFamily: Fonts.semiBold,
   },
 });

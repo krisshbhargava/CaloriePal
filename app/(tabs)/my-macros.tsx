@@ -1,9 +1,10 @@
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Layout } from '@/constants/theme';
+import { Colors, Fonts, Layout, Shadows } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getWeeklyMacroSummaries } from '@/services/macro-aggregation';
@@ -50,7 +51,7 @@ export default function MyMacrosScreen() {
           </ThemedText>
         </ThemedView>
 
-        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
           <ThemedText type="subtitle">Daily goals</ThemedText>
           <ThemedText style={styles.goalsHint}>Set your daily targets (used for progress on the home screen).</ThemedText>
           <View style={styles.goalRow}>
@@ -99,7 +100,7 @@ export default function MyMacrosScreen() {
           </View>
         </ThemedView>
 
-        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
           <ThemedText type="subtitle">Weekly calories</ThemedText>
           {weekly.map((day) => {
             const goal = macroGoals.calories || 2000;
@@ -116,7 +117,7 @@ export default function MyMacrosScreen() {
           })}
         </ThemedView>
 
-        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
           <ThemedText type="subtitle">Trend snapshot</ThemedText>
           <ThemedView style={[styles.statRow, { backgroundColor: theme.surface }]}>
             <ThemedText>Weekly average</ThemedText>
@@ -130,11 +131,11 @@ export default function MyMacrosScreen() {
           </ThemedView>
         </ThemedView>
 
-        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
           <ThemedText style={[styles.accountEmail, { color: theme.tabIconDefault }]}>{email}</ThemedText>
-          <Pressable style={[styles.signOutButton, { borderColor: theme.cardBorder }]} onPress={signOut}>
-            <ThemedText style={styles.signOutText}>Sign out</ThemedText>
-          </Pressable>
+          <RaisedPressable style={[styles.signOutButton, { borderColor: theme.error }]} onPress={signOut} shadowColor={theme.error}>
+            <ThemedText style={[styles.signOutText, { color: theme.error }]}>Sign out</ThemedText>
+          </RaisedPressable>
         </ThemedView>
       </View>
     </ScrollView>
@@ -155,18 +156,16 @@ const styles = StyleSheet.create({
     gap: Layout.sectionGap,
   },
   headerCard: {
-    padding: Layout.cardPadding,
-    borderRadius: 16,
+    padding: 24,
+    borderRadius: 28,
     gap: 8,
   },
   section: {
     padding: Layout.cardPadding,
-    borderRadius: 16,
+    borderRadius: 20,
     gap: 12,
   },
-  card: {
-    borderWidth: 1,
-  },
+  card: { ...Shadows.card },
   goalsHint: {
     fontSize: 14,
     opacity: 0.85,
@@ -185,10 +184,11 @@ const styles = StyleSheet.create({
   },
   goalInput: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
+    fontFamily: Fonts.semiBold,
     minWidth: 88,
     textAlign: 'right',
   },
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
+    padding: 16,
+    borderRadius: 20,
   },
   accountEmail: {
     fontSize: 13,
@@ -229,13 +229,12 @@ const styles = StyleSheet.create({
   },
   signOutButton: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 999,
     paddingVertical: 12,
     alignItems: 'center',
   },
   signOutText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#e53e3e',
+    fontFamily: Fonts.bold,
   },
 });

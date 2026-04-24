@@ -5,9 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EditMealModal } from '@/components/edit-meal-modal';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
+import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Layout } from '@/constants/theme';
+import { Colors, Fonts, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 import { getDailyMacroSummary } from '@/services/macro-aggregation';
@@ -53,7 +54,7 @@ export default function DashboardScreen() {
             </ThemedText>
           </ThemedView>
 
-          <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+          <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
             <ThemedText type="subtitle">Daily progress</ThemedText>
             <ThemedText style={styles.progressHint}>Progress toward your daily goals (set in My Macros).</ThemedText>
             <ProgressBar
@@ -62,6 +63,7 @@ export default function DashboardScreen() {
               goal={macroGoals.calories}
               unit="kcal"
               theme={theme}
+              color={Colors.macro.calories}
             />
             <ProgressBar
               label="Protein"
@@ -69,6 +71,7 @@ export default function DashboardScreen() {
               goal={macroGoals.protein}
               unit="g"
               theme={theme}
+              color={Colors.macro.protein}
             />
             <ProgressBar
               label="Carbs"
@@ -76,6 +79,7 @@ export default function DashboardScreen() {
               goal={macroGoals.carbs}
               unit="g"
               theme={theme}
+              color={Colors.macro.carbs}
             />
             <ProgressBar
               label="Fat"
@@ -83,10 +87,11 @@ export default function DashboardScreen() {
               goal={macroGoals.fat}
               unit="g"
               theme={theme}
+              color={Colors.macro.fat}
             />
           </ThemedView>
 
-          <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+          <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
             <ThemedText type="subtitle">Today&apos;s Meals</ThemedText>
             {todaysMeals.length === 0 ? (
               <ThemedView style={[styles.emptyState, { backgroundColor: theme.surface }]}>
@@ -95,36 +100,26 @@ export default function DashboardScreen() {
                     ? "You haven't logged any meals yet."
                     : "No meals logged yet today."}
                 </ThemedText>
-                <Pressable
+                <RaisedPressable
                   style={[styles.addMealButton, { backgroundColor: theme.primary }]}
                   onPress={goToLogMeal}
                 >
-                  <ThemedText style={[styles.addMealButtonText, { color: theme.accent }]}>
+                  <ThemedText style={[styles.addMealButtonText, { color: '#fff' }]}>
                     {hasNoMeals ? 'Add your first meal' : 'Log a meal'}
                   </ThemedText>
-                </Pressable>
+                </RaisedPressable>
               </ThemedView>
             ) : (
               todaysMeals.map((meal) => (
-                <Pressable
+                <RaisedPressable
                   key={meal.id}
                   onPress={() => setEditingMeal(meal)}
-                  style={({ pressed }) => [
-                    styles.mealCard,
-                    { backgroundColor: theme.surface, borderLeftColor: theme.primary },
-                    pressed && styles.mealCardPressed,
-                  ]}
+                  style={[styles.mealCard, { backgroundColor: theme.surface, borderLeftColor: theme.primary }]}
+                  shadowColor={theme.primary}
                 >
-                  <View style={styles.mealCardHeader}>
-                    <ThemedText type="defaultSemiBold" style={styles.mealTitle} numberOfLines={1}>
-                      {meal.title}
-                    </ThemedText>
-                    <View style={[styles.editPill, { borderColor: theme.accent }]}>
-                      <ThemedText style={[styles.editPillText, { color: theme.accent }]}>
-                        Edit
-                      </ThemedText>
-                    </View>
-                  </View>
+                  <ThemedText type="defaultSemiBold" style={styles.mealTitle} numberOfLines={1}>
+                    {meal.title}
+                  </ThemedText>
                   <ThemedText style={styles.mealDescription} numberOfLines={2}>
                     {meal.description}
                   </ThemedText>
@@ -132,7 +127,7 @@ export default function DashboardScreen() {
                     {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fat}g
                   </ThemedText>
                   <MealBreakdownList components={meal.components} compact />
-                </Pressable>
+                </RaisedPressable>
               ))
             )}
           </ThemedView>
@@ -148,16 +143,19 @@ function ProgressBar({
   goal,
   unit,
   theme,
+  color,
 }: {
   label: string;
   current: number;
   goal: number;
   unit: string;
   theme: (typeof Colors)['light'];
+  color?: string;
 }) {
   const safeGoal = goal > 0 ? goal : 1;
   const percent = Math.min(100, Math.round((current / safeGoal) * 100));
   const isOver = current > safeGoal;
+  const fillColor = color ?? (isOver ? theme.accent : theme.primary);
 
   return (
     <View style={styles.progressBarRow}>
@@ -173,7 +171,7 @@ function ProgressBar({
             styles.progressBarFill,
             {
               width: `${percent}%`,
-              backgroundColor: isOver ? theme.accent : theme.primary,
+              backgroundColor: fillColor,
             },
           ]}
         />
@@ -196,16 +194,16 @@ const styles = StyleSheet.create({
     gap: Layout.sectionGap,
   },
   headerCard: {
-    padding: Layout.cardPadding,
-    borderRadius: 16,
+    padding: 24,
+    borderRadius: 28,
     gap: 8,
   },
   section: {
     padding: Layout.cardPadding,
-    borderRadius: 16,
+    borderRadius: 20,
     gap: 12,
   },
-  card: { borderWidth: 1 },
+  card: { ...Shadows.card },
   progressHint: {
     fontSize: 14,
     opacity: 0.85,
@@ -224,7 +222,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   progressBarTrack: {
-    height: 10,
+    height: 13,
     borderRadius: 999,
     overflow: 'hidden',
   },
@@ -233,47 +231,32 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   mealCard: {
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 14,
     gap: 4,
     borderLeftWidth: 4,
   },
-  mealCardPressed: { opacity: 0.7 },
-  mealCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-  },
   mealTitle: {
-    flex: 1,
-  },
-  editPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1.5,
-  },
-  editPillText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: Fonts.semiBold,
+    fontSize: 16,
+    marginBottom: 2,
   },
   mealDescription: { opacity: 0.7, fontSize: 13, lineHeight: 18 },
   mealMacros: { fontSize: 13, opacity: 0.85, marginTop: 4 },
   emptyState: {
     gap: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 14,
   },
   addMealButton: {
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: 999,
+    paddingVertical: 16,
     paddingHorizontal: 20,
     alignItems: 'center',
     alignSelf: 'flex-start',
   },
   addMealButtonText: {
-    fontWeight: '600',
+    fontFamily: Fonts.semiBold,
     fontSize: 16,
   },
 });

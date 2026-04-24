@@ -3,11 +3,14 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EditMealModal } from '@/components/edit-meal-modal';
+import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
-import { Colors, Fonts, Layout } from '@/constants/theme';
+import { Colors, Fonts, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { MealEntry } from '@/models/domain';
 import { getDateKey } from '@/services/macro-aggregation';
 import { useAppStore } from '@/store/app-store';
 
@@ -63,12 +66,13 @@ function buildMonthDays(mealsByDate: Record<string, { calories: number }>, month
 }
 
 export default function ExploreCalendarScreen() {
-  const { meals, dateNotes, setDateNote } = useAppStore();
+  const { meals, dateNotes, setDateNote, editMeal, startEditSession } = useAppStore();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => getDateKey(new Date()));
+  const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null);
 
   const selectedNote = dateNotes[selectedDateKey] ?? '';
   const selectedDateLabel = useMemo(() => {
@@ -118,29 +122,36 @@ export default function ExploreCalendarScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.scroll, { backgroundColor: theme.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + TOP_INSET_EXTRA }]}
+    <>
+      <EditMealModal
+        meal={editingMeal}
+        onClose={() => setEditingMeal(null)}
+        onSaveManual={(id, updates) => editMeal(id, updates)}
+        onEditWithAI={(meal) => startEditSession(meal)}
+      />
+      <ScrollView
+        style={[styles.scroll, { backgroundColor: theme.background }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + TOP_INSET_EXTRA }]}
       showsVerticalScrollIndicator={false}>
       <View style={styles.centered}>
         <ThemedView style={styles.header}>
-          <ThemedText type="title" style={{ fontFamily: Fonts.rounded }}>
+          <ThemedText type="title" style={{ fontFamily: Fonts.extraBold }}>
             Calendar
           </ThemedText>
           <ThemedText>Tap a day to see logged meals.</ThemedText>
         </ThemedView>
 
-        <ThemedView style={[styles.calendarCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+        <ThemedView style={[styles.calendarCard, { backgroundColor: theme.card }]}>
           <View style={styles.monthHeader}>
-            <Pressable onPress={handlePrevMonth} hitSlop={12} style={styles.monthNav}>
+            <RaisedPressable onPress={handlePrevMonth} hitSlop={12} style={styles.monthNav} shadowColor={theme.primary}>
               <ThemedText type="defaultSemiBold" style={{ color: theme.accent }}>{'‹'}</ThemedText>
-            </Pressable>
-            <ThemedText type="defaultSemiBold" style={[styles.monthLabel, { fontFamily: Fonts.rounded }]}>
+            </RaisedPressable>
+            <ThemedText type="defaultSemiBold" style={[styles.monthLabel, { fontFamily: Fonts.extraBold }]}>
               {calendar.label}
             </ThemedText>
-            <Pressable onPress={handleNextMonth} hitSlop={12} style={styles.monthNav}>
+            <RaisedPressable onPress={handleNextMonth} hitSlop={12} style={styles.monthNav} shadowColor={theme.primary}>
               <ThemedText type="defaultSemiBold" style={{ color: theme.accent }}>{'›'}</ThemedText>
-            </Pressable>
+            </RaisedPressable>
           </View>
 
           <View style={styles.weekdayRow}>
@@ -163,14 +174,15 @@ export default function ExploreCalendarScreen() {
                 const hasNote = !!(dateNotes[day.dateKey]?.trim());
 
                 return (
-                  <Pressable
+                  <RaisedPressable
                     key={dayIndex}
                     style={[
                       styles.dayCell,
                       { backgroundColor: theme.surface },
                       isSelected && { backgroundColor: theme.primary, borderWidth: 2, borderColor: theme.accent },
-                      hasCalories && !isSelected && styles.dayCellWithMeals,
+                      hasCalories && !isSelected && { backgroundColor: theme.primaryMuted },
                     ]}
+                    shadowColor={isSelected ? theme.accent : theme.primary}
                     onPress={() => setSelectedDateKey(day.dateKey)}>
                     {hasNote && (
                       <View style={[styles.noteDot, { backgroundColor: theme.accent }]} />
@@ -180,7 +192,7 @@ export default function ExploreCalendarScreen() {
                       style={[
                         styles.dayNumber,
                         isSelected && { color: theme.accent },
-                        isSelected && { fontFamily: Fonts.rounded },
+                        isSelected && { fontFamily: Fonts.extraBold },
                       ]}>
                       {day.date.getDate()}
                     </ThemedText>
@@ -191,34 +203,36 @@ export default function ExploreCalendarScreen() {
                         {day.calories} kcal
                       </ThemedText>
                     )}
-                  </Pressable>
+                  </RaisedPressable>
                 );
               })}
             </View>
           ))}
         </ThemedView>
 
-        <ThemedView style={[styles.mealsCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+        <ThemedView style={[styles.mealsCard, { backgroundColor: theme.card }]}>
           <ThemedText type="subtitle">Meals on selected day</ThemedText>
           {selectedMeals.length === 0 ? (
             <ThemedText>No meals logged on this day.</ThemedText>
           ) : (
             selectedMeals.map((meal) => (
-              <ThemedView
+              <RaisedPressable
                 key={meal.id}
-                style={[styles.mealItem, { backgroundColor: theme.surface, borderLeftColor: theme.primary }]}>
+                onPress={() => setEditingMeal(meal)}
+                style={[styles.mealItem, { backgroundColor: theme.surface, borderLeftColor: theme.primary }]}
+                shadowColor={theme.primary}>
                 <ThemedText type="defaultSemiBold">{meal.title}</ThemedText>
                 <ThemedText>{meal.description}</ThemedText>
                 <ThemedText>
                   {meal.calories} kcal • P {meal.protein} • C {meal.carbs} • F {meal.fat}
                 </ThemedText>
                 <MealBreakdownList components={meal.components} compact />
-              </ThemedView>
+              </RaisedPressable>
             ))
           )}
         </ThemedView>
 
-        <ThemedView style={[styles.notesCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
+        <ThemedView style={[styles.notesCard, { backgroundColor: theme.card }]}>
           <ThemedText type="subtitle">Notes for {selectedDateLabel}</ThemedText>
           <ThemedText style={styles.notesHint}>
             e.g. meal didn&apos;t sit well, had a headache, felt great
@@ -235,6 +249,7 @@ export default function ExploreCalendarScreen() {
         </ThemedView>
       </View>
     </ScrollView>
+    </>
   );
 }
 
@@ -257,10 +272,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   calendarCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 14,
     gap: 8,
-    borderWidth: 1,
+    ...Shadows.card,
   },
   monthHeader: {
     flexDirection: 'row',
@@ -292,13 +307,10 @@ const styles = StyleSheet.create({
   dayCell: {
     flex: 1,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
-  },
-  dayCellWithMeals: {
-    opacity: 0.95,
   },
   dayNumber: {
     fontSize: 14,
@@ -308,13 +320,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   mealsCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 14,
     gap: 10,
-    borderWidth: 1,
+    ...Shadows.card,
   },
   mealItem: {
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
     gap: 4,
     borderLeftWidth: 4,
@@ -328,10 +340,10 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   notesCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 14,
     gap: 10,
-    borderWidth: 1,
+    ...Shadows.card,
   },
   notesHint: {
     fontSize: 14,
@@ -339,9 +351,10 @@ const styles = StyleSheet.create({
   },
   notesInput: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 12,
     fontSize: 16,
+    fontFamily: Fonts.regular,
     minHeight: 88,
     textAlignVertical: 'top',
   },
