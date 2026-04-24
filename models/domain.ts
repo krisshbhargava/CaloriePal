@@ -21,6 +21,7 @@ export type MealEntry = {
   title: string;
   description: string;
   timestamp: string;
+  photoUri?: string;
   confidence: number;
   assumptions: string[];
   components: MealComponent[];

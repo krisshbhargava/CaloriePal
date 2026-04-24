@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EditMealModal } from '@/components/edit-meal-modal';
@@ -17,7 +19,8 @@ import { useAppStore } from '@/store/app-store';
 const TOP_INSET_EXTRA = 12;
 
 export default function DashboardScreen() {
-  const { meals, editMeal, startEditSession, macroGoals } = useAppStore();
+  const { meals, editMeal, startEditSession, macroGoals, attachMealPhoto, hasPremiumAccess, isAdmin, premiumPrice } =
+    useAppStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
@@ -27,11 +30,62 @@ export default function DashboardScreen() {
   const hasNoMeals = meals.length === 0;
 
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null);
+  const [showPremiumPaywall, setShowPremiumPaywall] = useState(false);
 
   const goToLogMeal = () => router.push('/(tabs)/log-meal');
 
+  const handleAttachPhoto = async (mealId: string) => {
+    if (!hasPremiumAccess) {
+      setShowPremiumPaywall(true);
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Needed', 'Please allow photo library access to attach meal photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [4, 3],
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      attachMealPhoto(mealId, result.assets[0].uri);
+    }
+  };
+
   return (
     <>
+      <Modal visible={showPremiumPaywall} transparent animationType="fade" onRequestClose={() => setShowPremiumPaywall(false)}>
+        <View style={styles.paywallOverlay}>
+          <ThemedView style={[styles.paywallCard, { backgroundColor: theme.card }]}>
+            <ThemedText type="subtitle">Premium Feature</ThemedText>
+            <ThemedText>
+              Photo uploads are available on Premium for {premiumPrice}/month.
+            </ThemedText>
+            <View style={styles.paywallActions}>
+              <Pressable
+                onPress={() => setShowPremiumPaywall(false)}
+                style={[styles.photoAttachButton, { borderColor: theme.cardBorder, backgroundColor: theme.surface }]}>
+                <ThemedText>Not now</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setShowPremiumPaywall(false);
+                  Alert.alert('Upgrade', 'Subscription checkout can be connected next (Stripe/RevenueCat).');
+                }}
+                style={[styles.photoAttachButton, { borderColor: theme.accent, backgroundColor: theme.primaryMuted }]}>
+                <ThemedText style={{ color: theme.accent }}>Upgrade</ThemedText>
+              </Pressable>
+            </View>
+          </ThemedView>
+        </View>
+      </Modal>
+
       <EditMealModal
         meal={editingMeal}
         onClose={() => setEditingMeal(null)}
@@ -92,7 +146,14 @@ export default function DashboardScreen() {
           </ThemedView>
 
           <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
-            <ThemedText type="subtitle">Today&apos;s Meals</ThemedText>
+            <View style={styles.sectionHeaderRow}>
+              <ThemedText type="subtitle">Today&apos;s Meals</ThemedText>
+              {(hasPremiumAccess || isAdmin) && (
+                <ThemedText style={[styles.premiumBadge, { color: theme.accent, borderColor: theme.accent }]}>
+                  PREMIUM
+                </ThemedText>
+              )}
+            </View>
             {todaysMeals.length === 0 ? (
               <ThemedView style={[styles.emptyState, { backgroundColor: theme.surface }]}>
                 <ThemedText>
@@ -111,11 +172,9 @@ export default function DashboardScreen() {
               </ThemedView>
             ) : (
               todaysMeals.map((meal) => (
-                <RaisedPressable
+                <ThemedView
                   key={meal.id}
-                  onPress={() => setEditingMeal(meal)}
                   style={[styles.mealCard, { backgroundColor: theme.surface, borderLeftColor: theme.primary }]}
-                  shadowColor={theme.primary}
                 >
                   <ThemedText type="defaultSemiBold" style={styles.mealTitle} numberOfLines={1}>
                     {meal.title}
@@ -126,8 +185,35 @@ export default function DashboardScreen() {
                   <ThemedText style={styles.mealMacros}>
                     {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fat}g
                   </ThemedText>
+                  {!!meal.photoUri && (
+                    <Image source={{ uri: meal.photoUri }} style={styles.mealPhoto} contentFit="cover" />
+                  )}
+                  <Pressable
+                    onPress={() => void handleAttachPhoto(meal.id)}
+                    style={[
+                      styles.photoAttachButton,
+                      {
+                        borderColor: theme.cardBorder,
+                        backgroundColor: theme.background,
+                      },
+                    ]}>
+                    <ThemedText style={{ color: theme.accent }}>
+                      {meal.photoUri ? 'Change photo' : 'Attach photo (Premium)'}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setEditingMeal(meal)}
+                    style={[
+                      styles.photoAttachButton,
+                      {
+                        borderColor: theme.accent,
+                        backgroundColor: theme.primaryMuted,
+                      },
+                    ]}>
+                    <ThemedText style={{ color: theme.accent }}>Edit meal</ThemedText>
+                  </Pressable>
                   <MealBreakdownList components={meal.components} compact />
-                </RaisedPressable>
+                </ThemedView>
               ))
             )}
           </ThemedView>
@@ -203,6 +289,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 12,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  premiumBadge: {
+    fontSize: 11,
+    fontFamily: Fonts.bold,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
   card: { ...Shadows.card },
   progressHint: {
     fontSize: 14,
@@ -243,6 +343,20 @@ const styles = StyleSheet.create({
   },
   mealDescription: { opacity: 0.7, fontSize: 13, lineHeight: 18 },
   mealMacros: { fontSize: 13, opacity: 0.85, marginTop: 4 },
+  mealPhoto: {
+    marginTop: 8,
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+  },
+  photoAttachButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   emptyState: {
     gap: 12,
     borderRadius: 16,
@@ -258,5 +372,23 @@ const styles = StyleSheet.create({
   addMealButtonText: {
     fontFamily: Fonts.semiBold,
     fontSize: 16,
+  },
+  paywallOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  paywallCard: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  paywallActions: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
   },
 });

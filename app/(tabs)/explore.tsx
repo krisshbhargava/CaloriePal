@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { ScrollView, StyleSheet, TextInput, View, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EditMealModal } from '@/components/edit-meal-modal';
@@ -73,6 +74,7 @@ export default function ExploreCalendarScreen() {
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => getDateKey(new Date()));
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null);
+  const [expandedMealIds, setExpandedMealIds] = useState<Record<string, boolean>>({});
 
   const selectedNote = dateNotes[selectedDateKey] ?? '';
   const selectedDateLabel = useMemo(() => {
@@ -119,6 +121,10 @@ export default function ExploreCalendarScreen() {
       next.setMonth(prev.getMonth() + 1);
       return next;
     });
+  };
+
+  const toggleMealExpanded = (mealId: string) => {
+    setExpandedMealIds((prev) => ({ ...prev, [mealId]: !prev[mealId] }));
   };
 
   return (
@@ -216,18 +222,39 @@ export default function ExploreCalendarScreen() {
             <ThemedText>No meals logged on this day.</ThemedText>
           ) : (
             selectedMeals.map((meal) => (
-              <RaisedPressable
+              <ThemedView
                 key={meal.id}
-                onPress={() => setEditingMeal(meal)}
                 style={[styles.mealItem, { backgroundColor: theme.surface, borderLeftColor: theme.primary }]}
-                shadowColor={theme.primary}>
-                <ThemedText type="defaultSemiBold">{meal.title}</ThemedText>
-                <ThemedText>{meal.description}</ThemedText>
-                <ThemedText>
-                  {meal.calories} kcal • P {meal.protein} • C {meal.carbs} • F {meal.fat}
-                </ThemedText>
-                <MealBreakdownList components={meal.components} compact />
-              </RaisedPressable>
+                >
+                <Pressable onPress={() => toggleMealExpanded(meal.id)} style={styles.mealSummaryRow}>
+                  <View style={styles.mealSummaryLeft}>
+                    {!!meal.photoUri && (
+                      <Image source={{ uri: meal.photoUri }} style={styles.mealThumb} contentFit="cover" />
+                    )}
+                    <View style={styles.mealSummaryTextWrap}>
+                      <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                        {meal.title}
+                      </ThemedText>
+                      <ThemedText style={styles.mealCaloriesBubble}>{meal.calories} kcal</ThemedText>
+                    </View>
+                  </View>
+                  <ThemedText style={{ color: theme.accent }}>
+                    {expandedMealIds[meal.id] ? 'Hide' : 'Details'}
+                  </ThemedText>
+                </Pressable>
+                {expandedMealIds[meal.id] && (
+                  <View style={styles.mealDetails}>
+                    <ThemedText>{meal.description}</ThemedText>
+                    <ThemedText>
+                      P {meal.protein} • C {meal.carbs} • F {meal.fat}
+                    </ThemedText>
+                    <MealBreakdownList components={meal.components} compact />
+                    <Pressable onPress={() => setEditingMeal(meal)} style={styles.editMealRow}>
+                      <ThemedText style={{ color: theme.accent }}>Edit meal</ThemedText>
+                    </Pressable>
+                  </View>
+                )}
+              </ThemedView>
             ))
           )}
         </ThemedView>
@@ -330,6 +357,40 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
     borderLeftWidth: 4,
+  },
+  mealSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  mealSummaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  mealThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  mealSummaryTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  mealCaloriesBubble: {
+    alignSelf: 'flex-start',
+    fontSize: 12,
+    opacity: 0.8,
+  },
+  mealDetails: {
+    marginTop: 10,
+    gap: 6,
+  },
+  editMealRow: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
   },
   noteDot: {
     position: 'absolute',

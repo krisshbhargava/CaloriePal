@@ -33,6 +33,16 @@ const DEFAULT_MACRO_GOALS: MacroGoals = {
   fat: 65,
 };
 
+const PREMIUM_MONTHLY_PRICE = '$5.99';
+const ADMIN_EMAILS = (process.env.EXPO_PUBLIC_ADMIN_EMAILS ?? '')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+const PREMIUM_EMAILS = (process.env.EXPO_PUBLIC_PREMIUM_EMAILS ?? '')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+
 type AppStateContextValue = {
   meals: MealEntry[];
   chatMessages: ChatMessage[];
@@ -45,7 +55,11 @@ type AppStateContextValue = {
   editingMealId: string | null;
   dateNotes: Record<string, string>;
   macroGoals: MacroGoals;
+  isAdmin: boolean;
+  hasPremiumAccess: boolean;
+  premiumPrice: string;
   setMacroGoals: (updates: Partial<MacroGoals>) => void;
+  attachMealPhoto: (mealId: string, photoUri: string) => void;
   sendMessage: (text: string, inputMethod?: 'text' | 'voice') => Promise<void>;
   saveMealFromInterpretation: (
     description: string,
@@ -74,6 +88,9 @@ function makeChatMessage(message: Omit<ChatMessage, 'id' | 'createdAt'>): ChatMe
 export function AppStoreProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
+  const normalizedEmail = user?.email?.trim().toLowerCase() ?? '';
+  const isAdmin = normalizedEmail !== '' && ADMIN_EMAILS.includes(normalizedEmail);
+  const hasPremiumAccess = isAdmin || (normalizedEmail !== '' && PREMIUM_EMAILS.includes(normalizedEmail));
 
   const [meals, setMeals] = useState<MealEntry[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -220,11 +237,14 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       setChatStatus('saving');
 
+      const existingMeal = editingMealId ? meals.find((candidate) => candidate.id === editingMealId) : null;
+
       const meal: MealEntry = {
         id: editingMealId ?? buildId('meal'),
         title: activeDraft.mealTitle,
         description: description.trim() || activeDraft.sourceText,
         timestamp: new Date().toISOString(),
+        photoUri: existingMeal?.photoUri,
         calories: activeDraft.estimatedMacros.calories,
         protein: activeDraft.estimatedMacros.protein,
         carbs: activeDraft.estimatedMacros.carbs,
@@ -272,7 +292,23 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       return meal;
     },
-    [activeDraft, pendingInterpretation, editingMealId, uid]
+    [activeDraft, pendingInterpretation, editingMealId, meals, uid]
+  );
+
+  const attachMealPhoto = useCallback(
+    (mealId: string, photoUri: string) => {
+      setMeals((prev) => {
+        const next = prev.map((meal) => (meal.id === mealId ? { ...meal, photoUri } : meal));
+        if (uid) {
+          const updated = next.find((meal) => meal.id === mealId);
+          if (updated) {
+            saveMeal(uid, updated).catch(console.error);
+          }
+        }
+        return next;
+      });
+    },
+    [uid]
   );
 
   const editMeal = useCallback(
@@ -377,7 +413,11 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       editingMealId,
       dateNotes,
       macroGoals,
+      isAdmin,
+      hasPremiumAccess,
+      premiumPrice: PREMIUM_MONTHLY_PRICE,
       setMacroGoals,
+      attachMealPhoto,
       sendMessage,
       saveMealFromInterpretation,
       editMeal,
@@ -398,7 +438,10 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       editingMealId,
       dateNotes,
       macroGoals,
+      isAdmin,
+      hasPremiumAccess,
       setMacroGoals,
+      attachMealPhoto,
       sendMessage,
       saveMealFromInterpretation,
       editMeal,
