@@ -5,7 +5,7 @@ import { RaisedPressable } from '@/components/raised-pressable';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Shadows } from '@/constants/theme';
+import { Colors, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   closeBtnText: {
     fontSize: 18,
     opacity: 0.6,
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
   },
   aiBtn: {
     borderRadius: 20,
@@ -168,13 +168,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   aiBtnText: {
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     fontSize: 15,
   },
   aiBtnSub: {
     opacity: 0.7,
     fontSize: 13,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   dividerLabel: {
     fontSize: 12,
     opacity: 0.5,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   fields: {
     gap: 10,
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 12,
     opacity: 0.5,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   fieldInput: {
     borderWidth: 1,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    fontFamily: Fonts.semiBold,
+    fontWeight: '600' as const,
   },
   saveBtn: {
     borderRadius: 999,
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     color: '#fff',
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     fontSize: 17,
   },
 });

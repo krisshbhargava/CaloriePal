@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 16,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   form: {
     gap: 16,
@@ -155,12 +155,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 16,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   error: {
     fontSize: 14,
     textAlign: 'center',
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   button: {
     borderRadius: 999,
@@ -170,15 +170,15 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     fontSize: 17,
   },
   switchText: {
     textAlign: 'center',
     fontSize: 14,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   switchLink: {
-    fontFamily: Fonts.semiBold,
+    fontWeight: '600' as const,
   },
 });

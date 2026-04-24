@@ -5,7 +5,7 @@ import { RaisedPressable } from '@/components/raised-pressable';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Shadows } from '@/constants/theme';
+import { Colors, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 
@@ -125,11 +125,11 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     color: '#fff',
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     fontSize: 15,
   },
   savedLabel: {
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
   },
   mealTitle: {
     textAlign: 'center',
@@ -140,13 +140,13 @@ const styles = StyleSheet.create({
   },
   calorieNumber: {
     fontSize: 60,
-    fontFamily: Fonts.extraBold,
+    fontWeight: '800' as const,
     lineHeight: 66,
   },
   calorieUnit: {
     fontSize: 16,
     opacity: 0.5,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   macroRow: {
     flexDirection: 'row',
@@ -162,11 +162,11 @@ const styles = StyleSheet.create({
   },
   pillValue: {
     fontSize: 18,
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
   },
   pillLabel: {
     fontSize: 12,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   assumptions: {
     width: '100%',
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   assumptionsLabel: {
     fontSize: 12,
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     opacity: 0.5,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   assumption: {
     fontSize: 13,
     opacity: 0.7,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
   },
   doneBtn: {
     width: '100%',
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   doneBtnText: {
     color: '#fff',
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     fontSize: 17,
   },
 });

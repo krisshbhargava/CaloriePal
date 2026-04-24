@@ -48,10 +48,10 @@ export const Colors = {
 };
 
 export const Fonts = {
-  regular: 'Nunito_400Regular',
-  semiBold: 'Nunito_600SemiBold',
-  bold: 'Nunito_700Bold',
-  extraBold: 'Nunito_800ExtraBold',
+  regular: undefined as string | undefined,
+  semiBold: undefined as string | undefined,
+  bold: undefined as string | undefined,
+  extraBold: undefined as string | undefined,
 };
 
 export const Layout = {

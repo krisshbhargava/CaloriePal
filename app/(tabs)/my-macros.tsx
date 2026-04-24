@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Layout, Shadows } from '@/constants/theme';
+import { Colors, Layout, Shadows } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getWeeklyMacroSummaries } from '@/services/macro-aggregation';
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    fontFamily: Fonts.semiBold,
+    fontWeight: '600' as const,
     minWidth: 88,
     textAlign: 'right',
   },
@@ -235,6 +235,6 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     fontSize: 15,
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
   },
 });

@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontFamily: 'Nunito_700Bold',
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -67,12 +67,12 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 13,
-    fontFamily: 'Nunito_600SemiBold',
+    fontWeight: '600',
   },
   itemMacros: {
     fontSize: 12,
     opacity: 0.9,
     lineHeight: 18,
-    fontFamily: 'Nunito_400Regular',
+    fontWeight: '400',
   },
 });

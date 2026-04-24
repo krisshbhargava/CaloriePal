@@ -10,7 +10,7 @@ import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Layout, Shadows } from '@/constants/theme';
+import { Colors, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 import { getDailyMacroSummary } from '@/services/macro-aggregation';
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   },
   premiumBadge: {
     fontSize: 11,
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 8,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
   },
   mealTitle: {
-    fontFamily: Fonts.semiBold,
+    fontWeight: '600' as const,
     fontSize: 16,
     marginBottom: 2,
   },
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   addMealButtonText: {
-    fontFamily: Fonts.semiBold,
+    fontWeight: '600' as const,
     fontSize: 16,
   },
   paywallOverlay: {

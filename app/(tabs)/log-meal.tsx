@@ -6,6 +6,7 @@ import {
   useSpeechRecognitionEvent,
 } from 'expo-speech-recognition';
 import {
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Mic, MicOff } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
@@ -24,7 +25,7 @@ import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TypingDots } from '@/components/typing-dots';
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useRemoteConfig } from '@/context/remote-config-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ChatSessionStatus, MealDraft } from '@/models/domain';
@@ -33,6 +34,54 @@ import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
 const LISTENING_CUE = require('../../assets/Sfx/Blip6.wav');
+
+function MicPulseRings({ active, color }: { active: boolean; color: string }) {
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!active) {
+      ring1.setValue(0);
+      ring2.setValue(0);
+      return;
+    }
+    const makePulse = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: 1, duration: 900, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ])
+      );
+    const a1 = makePulse(ring1, 0);
+    const a2 = makePulse(ring2, 420);
+    a1.start();
+    a2.start();
+    return () => {
+      a1.stop();
+      a2.stop();
+    };
+  }, [active, ring1, ring2]);
+
+  const ringStyle = (val: Animated.Value) => ({
+    position: 'absolute' as const,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    borderColor: color,
+    opacity: val.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.5, 0] }),
+    transform: [{ scale: val.interpolate({ inputRange: [0, 1], outputRange: [1, 2.1] }) }],
+  });
+
+  if (!active) return null;
+  return (
+    <>
+      <Animated.View pointerEvents="none" style={ringStyle(ring1)} />
+      <Animated.View pointerEvents="none" style={ringStyle(ring2)} />
+    </>
+  );
+}
 
 export default function LogMealScreen() {
   const {
@@ -688,22 +737,23 @@ export default function LogMealScreen() {
             onSubmitEditing={onSend}
             editable={!isInterpreting}
           />
-          <RaisedPressable
-            style={[
-              styles.voiceBtn,
-              {
-                backgroundColor: voiceModeEnabled ? theme.accent : theme.surface,
-                borderColor: theme.cardBorder,
-              },
-            ]}
-            shadowColor={voiceModeEnabled ? theme.accent : theme.primary}
-            onPress={() => void toggleVoiceMode()}>
-            <MaterialIcons
-              name={voiceModeEnabled ? 'mic' : 'mic-none'}
-              size={22}
-              color={voiceModeEnabled ? theme.background : theme.text}
-            />
-          </RaisedPressable>
+          <View style={styles.micWrapper}>
+            <MicPulseRings active={isListening} color={theme.accent} />
+            <RaisedPressable
+              style={[
+                styles.voiceBtn,
+                {
+                  backgroundColor: voiceModeEnabled ? theme.accent : theme.surface,
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+              shadowColor={voiceModeEnabled ? theme.accent : theme.primary}
+              onPress={() => void toggleVoiceMode()}>
+              {voiceModeEnabled
+                ? <Mic size={22} color={theme.background} />
+                : <MicOff size={22} color={theme.text} />}
+            </RaisedPressable>
+          </View>
           <RaisedPressable
             style={[
               styles.sendBtn,
@@ -762,7 +812,11 @@ const toastStyles = StyleSheet.create({
   text: {
     color: '#fff',
     fontSize: 14,
-    fontFamily: Fonts.semiBold,
+    fontWeight: '600' as const,
+  },
+  micWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
@@ -849,7 +903,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderWidth: 1.5,
   },
-  chipText: { fontSize: 14, fontFamily: Fonts.semiBold },
+  chipText: { fontSize: 14, fontWeight: '600' as const },
   voiceCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -864,7 +918,7 @@ const styles = StyleSheet.create({
   },
   voiceBadge: {
     fontSize: 12,
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -896,7 +950,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   saveBtn: { borderWidth: 0 },
-  saveBtnText: { fontFamily: Fonts.bold },
+  saveBtnText: { fontWeight: '700' as const },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -911,7 +965,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
     maxHeight: 100,
   },
   voiceBtn: {
@@ -924,7 +978,7 @@ const styles = StyleSheet.create({
   },
   voiceBtnText: {
     fontSize: 12,
-    fontFamily: Fonts.bold,
+    fontWeight: '700' as const,
   },
   sendBtn: {
     width: 40,
@@ -934,7 +988,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnDisabled: {},
-  sendBtnText: { fontSize: 18, fontFamily: Fonts.bold },
+  sendBtnText: { fontSize: 18, fontWeight: '700' as const },
   devBuildHint: {
     paddingHorizontal: 12,
     paddingVertical: 10,

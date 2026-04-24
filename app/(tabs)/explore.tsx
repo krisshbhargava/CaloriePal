@@ -9,7 +9,7 @@ import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
-import { Colors, Fonts, Layout, Shadows } from '@/constants/theme';
+import { Colors, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 import { getDateKey } from '@/services/macro-aggregation';
@@ -141,7 +141,7 @@ export default function ExploreCalendarScreen() {
       showsVerticalScrollIndicator={false}>
       <View style={styles.centered}>
         <ThemedView style={styles.header}>
-          <ThemedText type="title" style={{ fontFamily: Fonts.extraBold }}>
+          <ThemedText type="title" style={{ fontWeight: '800' as const }}>
             Calendar
           </ThemedText>
           <ThemedText>Tap a day to see logged meals.</ThemedText>
@@ -152,7 +152,7 @@ export default function ExploreCalendarScreen() {
             <RaisedPressable onPress={handlePrevMonth} hitSlop={12} style={styles.monthNav} shadowColor={theme.primary}>
               <ThemedText type="defaultSemiBold" style={{ color: theme.accent }}>{'‹'}</ThemedText>
             </RaisedPressable>
-            <ThemedText type="defaultSemiBold" style={[styles.monthLabel, { fontFamily: Fonts.extraBold }]}>
+            <ThemedText type="defaultSemiBold" style={[styles.monthLabel, { fontWeight: '800' as const }]}>
               {calendar.label}
             </ThemedText>
             <RaisedPressable onPress={handleNextMonth} hitSlop={12} style={styles.monthNav} shadowColor={theme.primary}>
@@ -198,7 +198,7 @@ export default function ExploreCalendarScreen() {
                       style={[
                         styles.dayNumber,
                         isSelected && { color: theme.accent },
-                        isSelected && { fontFamily: Fonts.extraBold },
+                        isSelected && { fontWeight: '800' as const },
                       ]}>
                       {day.date.getDate()}
                     </ThemedText>
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 12,
     fontSize: 16,
-    fontFamily: Fonts.regular,
+    fontWeight: '400' as const,
     minHeight: 88,
     textAlignVertical: 'top',
   },
