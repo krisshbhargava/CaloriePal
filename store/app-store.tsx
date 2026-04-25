@@ -202,7 +202,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         sessionStartTimeRef.current = Date.now();
         sessionInputMethodRef.current = inputMethod;
         trackMealLogStarted(inputMethod);
-        if (uid) recordSessionStart(uid, inputMethod, user?.email ?? undefined).catch(console.error);
+        if (uid) recordSessionStart(uid, inputMethod, user?.email ?? undefined, premiumExperimentVariant ?? undefined).catch(console.error);
       }
 
       setChatError(null);
@@ -313,8 +313,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         : 0;
 
       if (uid) {
-        recordMealSaved(uid, meal.calories).catch(console.error);
-        recordSessionCompleted(uid, clarificationTurnsRef.current, durationSeconds).catch(console.error);
+        recordMealSaved(uid, meal.calories, premiumExperimentVariant ?? undefined).catch(console.error);
+        recordSessionCompleted(uid, clarificationTurnsRef.current, durationSeconds, premiumExperimentVariant ?? undefined).catch(console.error);
       }
       trackMealLogCompleted({
         durationSeconds,
@@ -437,7 +437,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       sessionStartTimeRef.current = Date.now();
       sessionInputMethodRef.current = 'text';
-      if (uid) recordSessionStart(uid, 'text', user?.email ?? undefined).catch(console.error);
+      if (uid) recordSessionStart(uid, 'text', user?.email ?? undefined, premiumExperimentVariant ?? undefined).catch(console.error);
 
       // Prime the session history with context
       sessionHistoryRef.current = [

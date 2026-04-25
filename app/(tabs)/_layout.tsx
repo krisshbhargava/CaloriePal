@@ -3,11 +3,9 @@ import { Tabs } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAppStore } from '@/store/app-store';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { isAdmin } = useAppStore();
 
   return (
     <Tabs
@@ -58,14 +56,6 @@ export default function TabLayout() {
         options={{
           title: 'Calendar',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="admin/index"
-        options={{
-          title: 'Admin',
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="shield.fill" color={color} />,
-          href: isAdmin ? undefined : null,
         }}
       />
     </Tabs>

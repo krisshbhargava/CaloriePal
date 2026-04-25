@@ -31,10 +31,9 @@ export default function DashboardScreen() {
     macroGoals,
     attachMealPhoto,
     hasPremiumAccess,
-    isAdmin,
     premiumExperimentVariant,
     premiumPrice,
-    switchToPaidForAlpha,
+
     setMealRating,
     toggleMealFavorite,
   } = useAppStore();
@@ -129,14 +128,9 @@ export default function DashboardScreen() {
                 <ThemedText>Not now</ThemedText>
               </Pressable>
               <Pressable
-                onPress={() => {
-                  recordPremiumInteraction('switch_to_paid_alpha_clicked', paywallSource);
-                  setShowPremiumPaywall(false);
-                  void switchToPaidForAlpha();
-                  Alert.alert('Premium Enabled', 'Alpha mode: your account now has paid access.');
-                }}
-                style={[styles.photoAttachButton, { borderColor: theme.accent, backgroundColor: theme.primaryMuted }]}>
-                <ThemedText style={{ color: theme.accent }}>Switch to paid (alpha)</ThemedText>
+                onPress={() => recordPremiumInteraction('switch_to_paid_alpha_clicked', paywallSource)}
+                style={[styles.photoAttachButton, { borderColor: theme.cardBorder, backgroundColor: theme.surface, opacity: 0.45 }]}>
+                <ThemedText>Upgrade (coming soon)</ThemedText>
               </Pressable>
             </View>
           </ThemedView>
@@ -161,17 +155,6 @@ export default function DashboardScreen() {
               <ThemedText type="title" lightColor={theme.background} darkColor={theme.background}>
                 Today&apos;s Progress
               </ThemedText>
-              {isAdmin && (
-                <Pressable
-                  onPress={() => router.push('/admin' as any)}
-                  style={styles.adminBadge}
-                  hitSlop={8}
-                >
-                  <ThemedText style={styles.adminBadgeText} lightColor="#fff" darkColor="#fff">
-                    Admin ↗
-                  </ThemedText>
-                </Pressable>
-              )}
             </View>
             <ThemedText lightColor="rgba(255,255,255,0.9)" darkColor="rgba(255,255,255,0.9)">
               Low-pressure progress. Log what you can.
@@ -218,7 +201,7 @@ export default function DashboardScreen() {
           <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
             <View style={styles.sectionHeaderRow}>
               <ThemedText type="subtitle">Today&apos;s Meals</ThemedText>
-              {(hasPremiumAccess || isAdmin) && (
+              {hasPremiumAccess && (
                 <ThemedText style={[styles.premiumBadge, { color: theme.accent, borderColor: theme.accent }]}>
                   PREMIUM
                 </ThemedText>
@@ -430,16 +413,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-  },
-  adminBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  adminBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   section: {
     padding: Layout.cardPadding,
