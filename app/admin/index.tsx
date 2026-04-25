@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityCharts } from '@/components/admin/charts';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { ThemedText } from '@/components/themed-text';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { fetchDailyAnalytics, fetchAllUserAnalytics, fetchMealHistory } from '@/services/firestore';
 import { useAppStore } from '@/store/app-store';
 import type { DailyAnalytics, UserAnalytics } from '@/models/analytics';
@@ -18,6 +20,8 @@ function formatDuration(totalSeconds: number): string {
 }
 
 function SkeletonBlock({ width, height }: { width: number | string; height: number }) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
   const opacity = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
     Animated.loop(
@@ -27,15 +31,17 @@ function SkeletonBlock({ width, height }: { width: number | string; height: numb
       ])
     ).start();
   }, [opacity]);
-  return <Animated.View style={[{ width, height, borderRadius: 12, backgroundColor: '#D1D5DB' }, { opacity }]} />;
+  return <Animated.View style={[{ width, height, borderRadius: 12, backgroundColor: theme.cardBorder }, { opacity }]} />;
 }
 
 function DashboardSkeleton() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
   return (
     <>
       <View style={styles.kpiRow}>
         {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-          <View key={i} style={styles.skeletonCard}>
+          <View key={i} style={[styles.skeletonCard, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
             <SkeletonBlock width={60} height={36} />
             <SkeletonBlock width={90} height={12} />
             <SkeletonBlock width={70} height={10} />
@@ -43,8 +49,8 @@ function DashboardSkeleton() {
         ))}
       </View>
       <View style={styles.skeletonChartRow}>
-        <View style={styles.skeletonChart}><SkeletonBlock width="100%" height={250} /></View>
-        <View style={styles.skeletonChart}><SkeletonBlock width="100%" height={250} /></View>
+        <View style={[styles.skeletonChart, { backgroundColor: theme.card }]}><SkeletonBlock width="100%" height={250} /></View>
+        <View style={[styles.skeletonChart, { backgroundColor: theme.card }]}><SkeletonBlock width="100%" height={250} /></View>
       </View>
     </>
   );
@@ -53,6 +59,8 @@ function DashboardSkeleton() {
 export default function AdminDashboard() {
   const { isAdmin } = useAppStore();
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [daily, setDaily] = useState<DailyAnalytics[]>([]);
@@ -112,18 +120,21 @@ export default function AdminDashboard() {
   const retainedUsers = users.filter((u) => (u.activeDates?.length ?? 0) >= 2).length;
   const retentionRate = totalUsers > 0 ? Math.round((retainedUsers / totalUsers) * 100) : 0;
 
+  const premiumTaps30 = daily.reduce((s, d) => s + d.premiumUpsellClicks, 0);
+  const voiceToggles30 = daily.reduce((s, d) => s + d.voiceToggles, 0);
+
   if (!isAdmin) return null;
 
   return (
     <ScrollView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: theme.background }]}
       contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32 }}
-      indicatorStyle="white"
+      indicatorStyle={colorScheme === 'dark' ? 'white' : 'black'}
     >
       <View style={styles.maxWidth}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={() => router.replace('/(tabs)')} style={styles.backBtn} hitSlop={8}>
+          <Pressable onPress={() => router.replace('/(tabs)')} style={[styles.backBtn, { backgroundColor: theme.card, borderColor: theme.cardBorder }]} hitSlop={8}>
             <ThemedText style={styles.backText}>← Back</ThemedText>
           </Pressable>
           <View style={styles.headerCenter}>
@@ -132,7 +143,7 @@ export default function AdminDashboard() {
           </View>
           <Pressable
             onPress={() => setRefreshKey((k) => k + 1)}
-            style={[styles.backBtn, loading && styles.btnDisabled]}
+            style={[styles.backBtn, { backgroundColor: theme.card, borderColor: theme.cardBorder }, loading && styles.btnDisabled]}
             hitSlop={8}
             disabled={loading}
           >
@@ -155,6 +166,8 @@ export default function AdminDashboard() {
               <KpiCard label="Avg Meals/Day" value={avgMealsDay} sub="on active days" accent="#6366F1" />
               <KpiCard label="Avg Session" value={avgDuration} sub="to log a meal" accent="#10B981" />
               <KpiCard label="Retention" value={retentionRate > 0 ? `${retentionRate}%` : '—'} sub="users on 2+ days" accent="#F43F5E" />
+              <KpiCard label="Premium Taps" value={premiumTaps30} sub="30-day upsell hits" accent="#8B5CF6" />
+              <KpiCard label="Voice Toggles" value={voiceToggles30} sub="30-day enables" accent="#06B6D4" />
             </View>
 
             {/* Charts */}
@@ -167,7 +180,7 @@ export default function AdminDashboard() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F1F3FB' },
+  root: { flex: 1 },
   maxWidth: {
     maxWidth: 1200,
     alignSelf: 'center',
@@ -185,11 +198,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800' },
   subtitle: { fontSize: 12, opacity: 0.4, marginTop: 2 },
   backBtn: {
-    backgroundColor: '#fff',
     borderRadius: 10,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    shadowColor: '#000',
+    shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
@@ -202,8 +215,8 @@ const styles = StyleSheet.create({
   skeletonCard: {
     flex: 1,
     minWidth: 140,
-    backgroundColor: '#fff',
     borderRadius: 16,
+    borderWidth: 1,
     padding: 20,
     gap: 8,
   },

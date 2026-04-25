@@ -1,4 +1,6 @@
 import { StyleSheet, View } from 'react-native';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@/components/themed-text';
 
 type Props = {
@@ -9,8 +11,11 @@ type Props = {
 };
 
 export function KpiCard({ label, value, sub, accent = '#6366F1' }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.cardBorder }]}>
       <ThemedText style={[styles.value, { color: accent }]}>{value}</ThemedText>
       <ThemedText style={styles.label}>{label}</ThemedText>
       {sub ? <ThemedText style={styles.sub}>{sub}</ThemedText> : null}
@@ -22,12 +27,10 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     minWidth: 140,
-    backgroundColor: '#161628',
     borderRadius: 16,
     padding: 20,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#2D2D45',
   },
   value: {
     fontSize: 32,

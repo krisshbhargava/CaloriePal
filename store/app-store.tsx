@@ -248,7 +248,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         setIsInterpreting(false);
       }
     },
-    [appendChatMessage, isInterpreting]
+    [appendChatMessage, isInterpreting, uid, user]
   );
 
   const saveMealFromInterpretation = useCallback(
@@ -452,7 +452,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const resetChatSession = useCallback(() => {
     if (activeDraft !== null || pendingInterpretation !== null) {
       trackMealLogAbandoned();
-      recordSessionAbandoned().catch(console.error);
+      recordSessionAbandoned(uid ?? undefined).catch(console.error);
     }
     sessionStartTimeRef.current = null;
     clarificationTurnsRef.current = 0;
@@ -465,7 +465,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     setEditingMealId(null);
     sessionHistoryRef.current = [];
     setChatMessages([]);
-  }, [activeDraft, pendingInterpretation]);
+  }, [activeDraft, pendingInterpretation, uid]);
 
   const value = useMemo<AppStateContextValue>(
     () => ({

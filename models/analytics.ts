@@ -6,6 +6,8 @@ export type DailyAnalytics = {
   sessionsAbandoned: number;
   clarificationsTotal: number;
   voiceModeSessions: number;
+  voiceToggles: number;
+  premiumUpsellClicks: number;
   totalCalories: number;
   totalSessionDuration: number;
   activeUsers: string[];
@@ -19,4 +21,5 @@ export type UserAnalytics = {
   totalSessions: number;
   totalSessionsCompleted: number;
   activeDates: string[];
+  premiumUpsellClicks?: number;
 };

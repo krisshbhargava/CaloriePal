@@ -14,6 +14,8 @@ import {
   YAxis,
 } from 'recharts';
 import { StyleSheet, View } from 'react-native';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@/components/themed-text';
 import type { DailyAnalytics, UserAnalytics } from '@/models/analytics';
 
@@ -31,18 +33,18 @@ function SectionTitle({ children }: { children: string }) {
   return <ThemedText style={styles.sectionTitle}>{children}</ThemedText>;
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({ title, children, bg, border }: { title: string; children: React.ReactNode; bg: string; border: string }) {
   return (
-    <View style={styles.chartCard}>
+    <View style={[styles.chartCard, { backgroundColor: bg, borderColor: border }]}>
       <ThemedText style={styles.chartTitle}>{title}</ThemedText>
       {children}
     </View>
   );
 }
 
-function EmptyChart() {
+function EmptyChart({ surface }: { surface: string }) {
   return (
-    <View style={styles.empty}>
+    <View style={[styles.empty, { backgroundColor: surface }]}>
       <ThemedText style={styles.emptyText}>No data yet</ThemedText>
       <ThemedText style={styles.emptyHint}>Starts populating when users log meals</ThemedText>
     </View>
@@ -55,19 +57,25 @@ function shortDate(iso: string) {
 }
 
 function allZero(data: Record<string, unknown>[], key: string): boolean {
-  return data.every((d) => !d[key]);
+  return data.every((d) => (d[key] as number) === 0);
 }
-
-const xAxisProps = {
-  tick: { fontSize: 10 },
-  angle: -35,
-  textAnchor: 'end' as const,
-  height: 48,
-};
 
 type Props = { daily: DailyAnalytics[]; users: UserAnalytics[] };
 
 export function ActivityCharts({ daily, users }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+  const isDark = colorScheme === 'dark';
+
+  const gridColor = isDark ? '#2D2D4A' : '#f0f0f0';
+  const axisColor = isDark ? '#9CA3AF' : '#6B7280';
+  const xAxisProps = {
+    tick: { fontSize: 10, fill: axisColor },
+    angle: -35,
+    textAnchor: 'end' as const,
+    height: 48,
+  };
+  const yAxisProps = { tick: { fontSize: 11, fill: axisColor }, width: 30 };
   const dauData = daily.map((d) => ({ date: shortDate(d.date), dau: d.activeUsers.length }));
   const mealsData = daily.map((d) => ({ date: shortDate(d.date), meals: d.mealsLogged }));
   const funnelData = daily.map((d) => ({
@@ -104,13 +112,13 @@ export function ActivityCharts({ daily, users }: Props) {
       {/* ── Engagement ── */}
       <SectionTitle>Engagement</SectionTitle>
       <View style={styles.row}>
-        <ChartCard title="Daily Active Users">
-          {allZero(dauData, 'dau') ? <EmptyChart /> : (
+        <ChartCard title="Daily Active Users" bg={theme.card} border={theme.cardBorder}>
+          {allZero(dauData, 'dau') ? <EmptyChart surface={theme.surface} /> : (
             <ResponsiveContainer width="100%" height={CHART_H}>
               <LineChart data={dauData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="date" {...xAxisProps} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={30} />
+                <YAxis {...yAxisProps} allowDecimals={false} />
                 <Tooltip formatter={(v: number) => [`${v} users`, 'DAU']} />
                 <Line type="monotone" dataKey="dau" stroke={C.primary} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
@@ -118,13 +126,13 @@ export function ActivityCharts({ daily, users }: Props) {
           )}
         </ChartCard>
 
-        <ChartCard title="Meals Logged Per Day">
-          {allZero(mealsData, 'meals') ? <EmptyChart /> : (
+        <ChartCard title="Meals Logged Per Day" bg={theme.card} border={theme.cardBorder}>
+          {allZero(mealsData, 'meals') ? <EmptyChart surface={theme.surface} /> : (
             <ResponsiveContainer width="100%" height={CHART_H}>
               <BarChart data={mealsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="date" {...xAxisProps} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={30} />
+                <YAxis {...yAxisProps} allowDecimals={false} />
                 <Tooltip formatter={(v: number) => [`${v} meals`, 'Logged']} />
                 <Bar dataKey="meals" fill={C.indigo2} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -136,15 +144,15 @@ export function ActivityCharts({ daily, users }: Props) {
       {/* ── AI Session Funnel ── */}
       <SectionTitle>AI Session Funnel</SectionTitle>
       <View style={styles.row}>
-        <ChartCard title="Session Outcomes (last 30 days)">
-          {allZero(funnelData, 'Completed') && allZero(funnelData, 'Abandoned') ? <EmptyChart /> : (
+        <ChartCard title="Session Outcomes (last 30 days)" bg={theme.card} border={theme.cardBorder}>
+          {allZero(funnelData, 'Completed') && allZero(funnelData, 'Abandoned') ? <EmptyChart surface={theme.surface} /> : (
             <ResponsiveContainer width="100%" height={CHART_H}>
               <BarChart data={funnelData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="date" {...xAxisProps} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={30} />
+                <YAxis {...yAxisProps} allowDecimals={false} />
                 <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12, color: axisColor }} />
                 <Bar dataKey="Completed" stackId="a" fill={C.green} />
                 <Bar dataKey="In Progress" stackId="a" fill={C.amber} />
                 <Bar dataKey="Abandoned" stackId="a" fill={C.red} radius={[4, 4, 0, 0]} />
@@ -153,13 +161,13 @@ export function ActivityCharts({ daily, users }: Props) {
           )}
         </ChartCard>
 
-        <ChartCard title="Avg Clarifications Per Session">
-          {allZero(clarData, 'rate') ? <EmptyChart /> : (
+        <ChartCard title="Avg Clarifications Per Session" bg={theme.card} border={theme.cardBorder}>
+          {allZero(clarData, 'rate') ? <EmptyChart surface={theme.surface} /> : (
             <ResponsiveContainer width="100%" height={CHART_H}>
               <LineChart data={clarData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="date" {...xAxisProps} />
-                <YAxis tick={{ fontSize: 11 }} width={30} />
+                <YAxis {...yAxisProps} />
                 <Tooltip formatter={(v: number) => [`${v}`, 'Clarifications / session']} />
                 <Line type="monotone" dataKey="rate" stroke={C.amber} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
@@ -171,13 +179,13 @@ export function ActivityCharts({ daily, users }: Props) {
       {/* ── Nutrition & Input ── */}
       <SectionTitle>Nutrition & Input</SectionTitle>
       <View style={styles.row}>
-        <ChartCard title="Avg Calories Per Meal">
-          {allZero(calData, 'avg') ? <EmptyChart /> : (
+        <ChartCard title="Avg Calories Per Meal" bg={theme.card} border={theme.cardBorder}>
+          {allZero(calData, 'avg') ? <EmptyChart surface={theme.surface} /> : (
             <ResponsiveContainer width="100%" height={CHART_H}>
               <LineChart data={calData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis dataKey="date" {...xAxisProps} />
-                <YAxis tick={{ fontSize: 11 }} width={40} />
+                <YAxis {...yAxisProps} width={40} />
                 <Tooltip formatter={(v: number) => [`${v} kcal`, 'Avg per meal']} />
                 <Line type="monotone" dataKey="avg" stroke={C.green} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
@@ -185,8 +193,8 @@ export function ActivityCharts({ daily, users }: Props) {
           )}
         </ChartCard>
 
-        <ChartCard title="Input Method (30-day)">
-          {!inputPieHasData ? <EmptyChart /> : (
+        <ChartCard title="Input Method (30-day)" bg={theme.card} border={theme.cardBorder}>
+          {!inputPieHasData ? <EmptyChart surface={theme.surface} /> : (
             <ResponsiveContainer width="100%" height={CHART_H}>
               <PieChart>
                 <Pie
@@ -197,7 +205,7 @@ export function ActivityCharts({ daily, users }: Props) {
                   outerRadius={95}
                   paddingAngle={4}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${Math.round(percent * 100)}%`}
+                  label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
                   labelLine={false}
                 >
                   <Cell fill={C.primary} />
@@ -212,8 +220,8 @@ export function ActivityCharts({ daily, users }: Props) {
 
       {/* ── Recent Users ── */}
       <SectionTitle>Recent Users</SectionTitle>
-      <View style={styles.table}>
-        <View style={[styles.tableRow, styles.tableHeader]}>
+      <View style={[styles.table, { backgroundColor: theme.card }]}>
+        <View style={[styles.tableRow, styles.tableHeader, { backgroundColor: theme.surface, borderBottomColor: theme.cardBorder }]}>
           {['User', 'Last Active', 'Total Meals', 'Sessions', 'Completed', 'Active Days'].map((h) => (
             <ThemedText key={h} style={styles.tableHead}>{h}</ThemedText>
           ))}
@@ -221,7 +229,7 @@ export function ActivityCharts({ daily, users }: Props) {
         {recentUsers.length === 0 ? (
           <ThemedText style={styles.tableEmpty}>No user data yet — starts recording on next session</ThemedText>
         ) : recentUsers.map((u) => (
-          <View key={u.uid} style={styles.tableRow}>
+          <View key={u.uid} style={[styles.tableRow, { borderBottomColor: theme.cardBorder }]}>
             <ThemedText style={styles.tableCell} numberOfLines={1}>
               {u.email ?? `${u.uid.slice(0, 10)}…`}
             </ThemedText>
@@ -251,8 +259,8 @@ const styles = StyleSheet.create({
   chartCard: {
     flex: 1,
     minWidth: 300,
-    backgroundColor: '#fff',
     borderRadius: 16,
+    borderWidth: 1,
     padding: 20,
     shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 2 },
@@ -266,13 +274,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FAFAFA',
     borderRadius: 10,
   },
   emptyText: { fontSize: 14, fontWeight: '600', opacity: 0.35 },
   emptyHint: { fontSize: 12, opacity: 0.3 },
   table: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#6366F1',
@@ -287,9 +293,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
   },
-  tableHeader: { backgroundColor: '#F9FAFB' },
+  tableHeader: {},
   tableHead: {
     flex: 1,
     fontSize: 11,

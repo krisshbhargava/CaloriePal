@@ -104,10 +104,20 @@ export async function recordSessionCompleted(uid: string, clarificationTurns: nu
   ]);
 }
 
-export async function recordSessionAbandoned(): Promise<void> {
-  await setDoc(doc(db, 'analytics_daily', todayKey()), {
-    sessionsAbandoned: increment(1),
-  }, { merge: true });
+export async function recordSessionAbandoned(uid?: string): Promise<void> {
+  const writes: Promise<void>[] = [
+    setDoc(doc(db, 'analytics_daily', todayKey()), {
+      sessionsAbandoned: increment(1),
+    }, { merge: true }),
+  ];
+  if (uid) {
+    writes.push(
+      setDoc(doc(db, 'analytics_users', uid), {
+        lastActive: new Date().toISOString(),
+      }, { merge: true })
+    );
+  }
+  await Promise.all(writes);
 }
 
 export async function recordMealSaved(uid: string, calories: number): Promise<void> {
@@ -124,6 +134,24 @@ export async function recordMealSaved(uid: string, calories: number): Promise<vo
       totalMeals: increment(1),
     }, { merge: true }),
   ]);
+}
+
+export async function recordPremiumUpsellClick(uid: string): Promise<void> {
+  await Promise.all([
+    setDoc(doc(db, 'analytics_daily', todayKey()), {
+      premiumUpsellClicks: increment(1),
+    }, { merge: true }),
+    setDoc(doc(db, 'analytics_users', uid), {
+      premiumUpsellClicks: increment(1),
+      lastActive: new Date().toISOString(),
+    }, { merge: true }),
+  ]);
+}
+
+export async function recordVoiceToggle(): Promise<void> {
+  await setDoc(doc(db, 'analytics_daily', todayKey()), {
+    voiceToggles: increment(1),
+  }, { merge: true });
 }
 
 // ── Analytics reads ─────────────────────────────────────────────────────────
@@ -144,6 +172,8 @@ export async function fetchDailyAnalytics(days: number): Promise<DailyAnalytics[
     sessionsAbandoned: 0,
     clarificationsTotal: 0,
     voiceModeSessions: 0,
+    voiceToggles: 0,
+    premiumUpsellClicks: 0,
     totalCalories: 0,
     totalSessionDuration: 0,
     activeUsers: [],

@@ -14,12 +14,15 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
+import { useAuth } from '@/context/auth-context';
 import { getDailyMacroSummary } from '@/services/macro-aggregation';
+import { recordPremiumUpsellClick } from '@/services/firestore';
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
 
 export default function DashboardScreen() {
+  const { user } = useAuth();
   const {
     meals,
     editMeal,
@@ -49,6 +52,7 @@ export default function DashboardScreen() {
 
   const handleAttachPhoto = async (mealId: string) => {
     if (!hasPremiumAccess) {
+      if (user?.uid) recordPremiumUpsellClick(user.uid).catch(console.error);
       setShowPremiumPaywall(true);
       return;
     }

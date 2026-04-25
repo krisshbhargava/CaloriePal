@@ -30,6 +30,7 @@ import { useRemoteConfig } from '@/context/remote-config-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ChatSessionStatus, MealDraft } from '@/models/domain';
 import { trackVoiceModeToggled } from '@/services/analytics';
+import { recordVoiceToggle } from '@/services/firestore';
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
@@ -521,6 +522,7 @@ export default function LogMealScreen() {
     setRecognitionAvailable(true);
     setVoiceModeEnabled(true);
     trackVoiceModeToggled(true);
+    recordVoiceToggle().catch(console.error);
     setVoiceStatus('Listening...');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
     void playListeningCue();
