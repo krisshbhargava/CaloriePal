@@ -128,7 +128,10 @@ export default function DashboardScreen() {
                 <ThemedText>Not now</ThemedText>
               </Pressable>
               <Pressable
-                onPress={() => recordPremiumInteraction('switch_to_paid_alpha_clicked', paywallSource)}
+                onPress={() => {
+                  recordPremiumInteraction('switch_to_paid_alpha_clicked', paywallSource);
+                  setShowPremiumPaywall(false);
+                }}
                 style={[styles.photoAttachButton, { borderColor: theme.cardBorder, backgroundColor: theme.surface, opacity: 0.45 }]}>
                 <ThemedText>Upgrade (coming soon)</ThemedText>
               </Pressable>

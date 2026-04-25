@@ -262,7 +262,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         setIsInterpreting(false);
       }
     },
-    [appendChatMessage, isInterpreting, uid, user]
+    [appendChatMessage, isInterpreting, uid, user, premiumExperimentVariant]
   );
 
   const saveMealFromInterpretation = useCallback(
