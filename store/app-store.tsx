@@ -11,7 +11,18 @@ import {
 } from '@/models/domain';
 import { useAuth } from '@/context/auth-context';
 import { GroqMessage, interpretMealWithGroq } from '@/services/meal-interpreter';
-import { fetchGoals, fetchMeals, fetchNotes, saveMeal, saveGoals, saveNote } from '@/services/firestore';
+import {
+  fetchGoals,
+  fetchMeals,
+  fetchNotes,
+  recordMealSaved,
+  recordSessionAbandoned,
+  recordSessionCompleted,
+  recordSessionStart,
+  saveMeal,
+  saveGoals,
+  saveNote,
+} from '@/services/firestore';
 import {
   trackClarificationNeeded,
   trackMealLogAbandoned,
@@ -159,6 +170,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         sessionStartTimeRef.current = Date.now();
         sessionInputMethodRef.current = inputMethod;
         trackMealLogStarted(inputMethod);
+        if (uid) recordSessionStart(uid, inputMethod, user?.email ?? undefined).catch(console.error);
       }
 
       setChatError(null);
@@ -267,6 +279,11 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       const durationSeconds = sessionStartTimeRef.current
         ? Math.round((Date.now() - sessionStartTimeRef.current) / 1000)
         : 0;
+
+      if (uid) {
+        recordMealSaved(uid, meal.calories).catch(console.error);
+        recordSessionCompleted(uid, clarificationTurnsRef.current, durationSeconds).catch(console.error);
+      }
       trackMealLogCompleted({
         durationSeconds,
         clarificationTurns: clarificationTurnsRef.current,
@@ -386,6 +403,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const resetChatSession = useCallback(() => {
     if (activeDraft !== null || pendingInterpretation !== null) {
       trackMealLogAbandoned();
+      recordSessionAbandoned().catch(console.error);
     }
     sessionStartTimeRef.current = null;
     clarificationTurnsRef.current = 0;

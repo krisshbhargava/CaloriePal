@@ -100,9 +100,22 @@ export default function DashboardScreen() {
       >
         <View style={styles.centered}>
           <ThemedView style={[styles.headerCard, { backgroundColor: theme.accent }]}>
-            <ThemedText type="title" lightColor={theme.background} darkColor={theme.background}>
-              Today&apos;s Progress
-            </ThemedText>
+            <View style={styles.headerCardTop}>
+              <ThemedText type="title" lightColor={theme.background} darkColor={theme.background}>
+                Today&apos;s Progress
+              </ThemedText>
+              {isAdmin && (
+                <Pressable
+                  onPress={() => router.push('/admin' as any)}
+                  style={styles.adminBadge}
+                  hitSlop={8}
+                >
+                  <ThemedText style={styles.adminBadgeText} lightColor="#fff" darkColor="#fff">
+                    Admin ↗
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
             <ThemedText lightColor="rgba(255,255,255,0.9)" darkColor="rgba(255,255,255,0.9)">
               Low-pressure progress. Log what you can.
             </ThemedText>
@@ -283,6 +296,21 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 28,
     gap: 8,
+  },
+  headerCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  adminBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  adminBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   section: {
     padding: Layout.cardPadding,

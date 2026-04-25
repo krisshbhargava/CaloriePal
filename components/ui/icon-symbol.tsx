@@ -6,6 +6,7 @@ import {
   Home,
   MessageCircle,
   Send,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { SymbolViewProps, SymbolWeight } from 'expo-symbols';
 import { OpaqueColorValue, type StyleProp, type ViewStyle } from 'react-native';
@@ -15,6 +16,7 @@ const ICON_MAP = {
   'message.fill': MessageCircle,
   'chart.bar.fill': BarChart2,
   'calendar': Calendar,
+  'shield.fill': ShieldCheck,
   'paperplane.fill': Send,
   'chevron.left.forwardslash.chevron.right': Code,
   'chevron.right': ChevronRight,
