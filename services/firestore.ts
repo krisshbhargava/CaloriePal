@@ -105,6 +105,15 @@ export async function fetchOrAssignPremiumAccessExperiment(
       typeof data.assignedAt === 'string' &&
       typeof data.updatedAt === 'string'
     ) {
+      setDoc(
+        doc(db, 'analytics_users', uid),
+        {
+          premiumAccessExperimentId: data.experimentId,
+          premiumAccessVariant: data.variant,
+          premiumAccessAssignedAt: data.assignedAt,
+        },
+        { merge: true }
+      ).catch(console.error);
       return data as PremiumAccessExperimentAssignment;
     }
   }
