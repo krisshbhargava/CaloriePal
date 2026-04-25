@@ -1,5 +1,6 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   ChatMessage,
@@ -45,6 +46,7 @@ const DEFAULT_MACRO_GOALS: MacroGoals = {
 };
 
 const PREMIUM_MONTHLY_PRICE = '$5.99';
+const ALPHA_PAID_KEY = 'alpha_paid_enabled';
 const ADMIN_EMAILS = (process.env.EXPO_PUBLIC_ADMIN_EMAILS ?? '')
   .split(',')
   .map((value) => value.trim().toLowerCase())
@@ -70,7 +72,10 @@ type AppStateContextValue = {
   hasPremiumAccess: boolean;
   premiumPrice: string;
   setMacroGoals: (updates: Partial<MacroGoals>) => void;
+  switchToPaidForAlpha: () => Promise<void>;
   attachMealPhoto: (mealId: string, photoUri: string) => void;
+  setMealRating: (mealId: string, rating: number) => void;
+  toggleMealFavorite: (mealId: string) => void;
   sendMessage: (text: string, inputMethod?: 'text' | 'voice') => Promise<void>;
   saveMealFromInterpretation: (
     description: string,
@@ -101,7 +106,9 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const uid = user?.uid ?? null;
   const normalizedEmail = user?.email?.trim().toLowerCase() ?? '';
   const isAdmin = normalizedEmail !== '' && ADMIN_EMAILS.includes(normalizedEmail);
-  const hasPremiumAccess = isAdmin || (normalizedEmail !== '' && PREMIUM_EMAILS.includes(normalizedEmail));
+  const [alphaPaidEnabled, setAlphaPaidEnabled] = useState(false);
+  const hasPremiumAccess =
+    isAdmin || alphaPaidEnabled || (normalizedEmail !== '' && PREMIUM_EMAILS.includes(normalizedEmail));
 
   const [meals, setMeals] = useState<MealEntry[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -114,6 +121,12 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [dateNotes, setDateNotes] = useState<Record<string, string>>({});
   const [macroGoals, setMacroGoalsState] = useState<MacroGoals>(DEFAULT_MACRO_GOALS);
+
+  useEffect(() => {
+    AsyncStorage.getItem(ALPHA_PAID_KEY)
+      .then((value) => setAlphaPaidEnabled(value === 'true'))
+      .catch(() => setAlphaPaidEnabled(false));
+  }, []);
 
   // Load all user data from Firestore when the user logs in
   useEffect(() => {
@@ -139,6 +152,11 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       return next;
     });
   }, [uid]);
+
+  const switchToPaidForAlpha = useCallback(async () => {
+    setAlphaPaidEnabled(true);
+    await AsyncStorage.setItem(ALPHA_PAID_KEY, 'true');
+  }, []);
 
   const setDateNote = useCallback((dateKey: string, note: string) => {
     setDateNotes((prev) => {
@@ -328,6 +346,37 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     [uid]
   );
 
+  const setMealRating = useCallback(
+    (mealId: string, rating: number) => {
+      setMeals((prev) => {
+        const boundedRating = Math.max(1, Math.min(5, Math.round(rating)));
+        const next = prev.map((meal) => (meal.id === mealId ? { ...meal, rating: boundedRating } : meal));
+        if (uid) {
+          const updated = next.find((meal) => meal.id === mealId);
+          if (updated) saveMeal(uid, updated).catch(console.error);
+        }
+        return next;
+      });
+    },
+    [uid]
+  );
+
+  const toggleMealFavorite = useCallback(
+    (mealId: string) => {
+      setMeals((prev) => {
+        const next = prev.map((meal) =>
+          meal.id === mealId ? { ...meal, isFavorite: !meal.isFavorite } : meal
+        );
+        if (uid) {
+          const updated = next.find((meal) => meal.id === mealId);
+          if (updated) saveMeal(uid, updated).catch(console.error);
+        }
+        return next;
+      });
+    },
+    [uid]
+  );
+
   const editMeal = useCallback(
     (id: string, updates: { title?: string; calories: number; protein: number; carbs: number; fat: number }) => {
       setMeals((prev) => {
@@ -435,7 +484,10 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       hasPremiumAccess,
       premiumPrice: PREMIUM_MONTHLY_PRICE,
       setMacroGoals,
+      switchToPaidForAlpha,
       attachMealPhoto,
+      setMealRating,
+      toggleMealFavorite,
       sendMessage,
       saveMealFromInterpretation,
       editMeal,
@@ -459,7 +511,10 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       isAdmin,
       hasPremiumAccess,
       setMacroGoals,
+      switchToPaidForAlpha,
       attachMealPhoto,
+      setMealRating,
+      toggleMealFavorite,
       sendMessage,
       saveMealFromInterpretation,
       editMeal,

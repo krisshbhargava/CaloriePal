@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EditMealModal } from '@/components/edit-meal-modal';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
+import { MealRatingFavoriteRow } from '@/components/meal-rating-favorite-row';
 import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -19,8 +20,19 @@ import { useAppStore } from '@/store/app-store';
 const TOP_INSET_EXTRA = 12;
 
 export default function DashboardScreen() {
-  const { meals, editMeal, startEditSession, macroGoals, attachMealPhoto, hasPremiumAccess, isAdmin, premiumPrice } =
-    useAppStore();
+  const {
+    meals,
+    editMeal,
+    startEditSession,
+    macroGoals,
+    attachMealPhoto,
+    hasPremiumAccess,
+    isAdmin,
+    premiumPrice,
+    switchToPaidForAlpha,
+    setMealRating,
+    toggleMealFavorite,
+  } = useAppStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
@@ -76,10 +88,11 @@ export default function DashboardScreen() {
               <Pressable
                 onPress={() => {
                   setShowPremiumPaywall(false);
-                  Alert.alert('Upgrade', 'Subscription checkout can be connected next (Stripe/RevenueCat).');
+                  void switchToPaidForAlpha();
+                  Alert.alert('Premium Enabled', 'Alpha mode: your account now has paid access.');
                 }}
                 style={[styles.photoAttachButton, { borderColor: theme.accent, backgroundColor: theme.primaryMuted }]}>
-                <ThemedText style={{ color: theme.accent }}>Upgrade</ThemedText>
+                <ThemedText style={{ color: theme.accent }}>Switch to paid (alpha)</ThemedText>
               </Pressable>
             </View>
           </ThemedView>
@@ -226,6 +239,14 @@ export default function DashboardScreen() {
                     <ThemedText style={{ color: theme.accent }}>Edit meal</ThemedText>
                   </Pressable>
                   <MealBreakdownList components={meal.components} compact />
+                  <MealRatingFavoriteRow
+                    meal={meal}
+                    theme={theme}
+                    hasPremiumAccess={hasPremiumAccess}
+                    onNeedPremium={() => setShowPremiumPaywall(true)}
+                    setMealRating={setMealRating}
+                    toggleMealFavorite={toggleMealFavorite}
+                  />
                 </ThemedView>
               ))
             )}

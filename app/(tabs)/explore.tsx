@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { ScrollView, StyleSheet, TextInput, View, Pressable } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, View, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +9,7 @@ import { RaisedPressable } from '@/components/raised-pressable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
+import { MealRatingFavoriteRow } from '@/components/meal-rating-favorite-row';
 import { Colors, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
@@ -67,7 +68,16 @@ function buildMonthDays(mealsByDate: Record<string, { calories: number }>, month
 }
 
 export default function ExploreCalendarScreen() {
-  const { meals, dateNotes, setDateNote, editMeal, startEditSession } = useAppStore();
+  const {
+    meals,
+    dateNotes,
+    setDateNote,
+    editMeal,
+    startEditSession,
+    hasPremiumAccess,
+    setMealRating,
+    toggleMealFavorite,
+  } = useAppStore();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -252,6 +262,19 @@ export default function ExploreCalendarScreen() {
                     <Pressable onPress={() => setEditingMeal(meal)} style={styles.editMealRow}>
                       <ThemedText style={{ color: theme.accent }}>Edit meal</ThemedText>
                     </Pressable>
+                    <MealRatingFavoriteRow
+                      meal={meal}
+                      theme={theme}
+                      hasPremiumAccess={hasPremiumAccess}
+                      onNeedPremium={() =>
+                        Alert.alert(
+                          'Premium Feature',
+                          'Ratings and favorites are available on Premium. Use Switch to paid (alpha) on Dashboard.'
+                        )
+                      }
+                      setMealRating={setMealRating}
+                      toggleMealFavorite={toggleMealFavorite}
+                    />
                   </View>
                 )}
               </ThemedView>

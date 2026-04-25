@@ -1,6 +1,5 @@
 import { Tabs } from 'expo-router';
 
-import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -32,7 +31,6 @@ export default function TabLayout() {
           fontSize: 11,
         },
         headerShown: false,
-        tabBarButton: HapticTab,
       }}>
       <Tabs.Screen
         name="index"
@@ -67,7 +65,6 @@ export default function TabLayout() {
         options={{
           title: 'Admin',
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="shield.fill" color={color} />,
-          tabBarButton: isAdmin ? HapticTab : () => null,
           href: isAdmin ? undefined : null,
         }}
       />
