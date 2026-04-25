@@ -10,7 +10,8 @@ type Props = {
   meal: MealEntry;
   theme: Theme;
   hasPremiumAccess: boolean;
-  onNeedPremium: () => void;
+  onNeedPremium: (action: 'meal_rating_tapped' | 'favorite_toggled') => void;
+  onPremiumInteraction?: (action: 'meal_rating_tapped' | 'favorite_toggled') => void;
   setMealRating: (mealId: string, rating: number) => void;
   toggleMealFavorite: (mealId: string) => void;
 };
@@ -20,14 +21,16 @@ export function MealRatingFavoriteRow({
   theme,
   hasPremiumAccess,
   onNeedPremium,
+  onPremiumInteraction,
   setMealRating,
   toggleMealFavorite,
 }: Props) {
-  const guard = () => {
+  const guard = (action: 'meal_rating_tapped' | 'favorite_toggled') => {
     if (!hasPremiumAccess) {
-      onNeedPremium();
+      onNeedPremium(action);
       return false;
     }
+    onPremiumInteraction?.(action);
     return true;
   };
 
@@ -39,7 +42,7 @@ export function MealRatingFavoriteRow({
             key={star}
             hitSlop={6}
             onPress={() => {
-              if (!guard()) return;
+              if (!guard('meal_rating_tapped')) return;
               setMealRating(meal.id, star);
             }}>
             <ThemedText style={[styles.star, meal.rating && meal.rating >= star ? styles.starFilled : styles.starEmpty]}>
@@ -51,7 +54,7 @@ export function MealRatingFavoriteRow({
       <Pressable
         hitSlop={8}
         onPress={() => {
-          if (!guard()) return;
+          if (!guard('favorite_toggled')) return;
           toggleMealFavorite(meal.id);
         }}
         style={[styles.heartBtn, { borderColor: theme.cardBorder }]}>

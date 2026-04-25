@@ -10,10 +10,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MealBreakdownList } from '@/components/meal-breakdown-list';
 import { MealRatingFavoriteRow } from '@/components/meal-rating-favorite-row';
+import { useAuth } from '@/context/auth-context';
 import { Colors, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
+import { trackPremiumExperimentInteraction } from '@/services/analytics';
 import { getDateKey } from '@/services/macro-aggregation';
+import { recordPremiumExperimentInteraction } from '@/services/firestore';
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
@@ -68,6 +71,7 @@ function buildMonthDays(mealsByDate: Record<string, { calories: number }>, month
 }
 
 export default function ExploreCalendarScreen() {
+  const { user } = useAuth();
   const {
     meals,
     dateNotes,
@@ -75,6 +79,7 @@ export default function ExploreCalendarScreen() {
     editMeal,
     startEditSession,
     hasPremiumAccess,
+    premiumExperimentVariant,
     setMealRating,
     toggleMealFavorite,
   } = useAppStore();
@@ -135,6 +140,19 @@ export default function ExploreCalendarScreen() {
 
   const toggleMealExpanded = (mealId: string) => {
     setExpandedMealIds((prev) => ({ ...prev, [mealId]: !prev[mealId] }));
+  };
+
+  const recordPremiumInteraction = (action: Parameters<typeof recordPremiumExperimentInteraction>[0]['action'], source: string) => {
+    const variant = premiumExperimentVariant ?? 'no_access';
+    trackPremiumExperimentInteraction({
+      action,
+      variant: premiumExperimentVariant ?? 'unknown',
+      source,
+      hasPremiumAccess,
+    });
+    if (user?.uid) {
+      recordPremiumExperimentInteraction({ uid: user.uid, variant, action }).catch(console.error);
+    }
   };
 
   return (
@@ -266,12 +284,14 @@ export default function ExploreCalendarScreen() {
                       meal={meal}
                       theme={theme}
                       hasPremiumAccess={hasPremiumAccess}
-                      onNeedPremium={() =>
+                      onNeedPremium={(action) => {
+                        recordPremiumInteraction(action, `explore_${action}`);
                         Alert.alert(
                           'Premium Feature',
                           'Ratings and favorites are available on Premium. Use Switch to paid (alpha) on Dashboard.'
-                        )
-                      }
+                        );
+                      }}
+                      onPremiumInteraction={(action) => recordPremiumInteraction(action, `explore_${action}`)}
                       setMealRating={setMealRating}
                       toggleMealFavorite={toggleMealFavorite}
                     />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -15,8 +15,9 @@ import { Colors, Layout, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MealEntry } from '@/models/domain';
 import { useAuth } from '@/context/auth-context';
+import { trackPremiumExperimentInteraction } from '@/services/analytics';
 import { getDailyMacroSummary } from '@/services/macro-aggregation';
-import { recordPremiumUpsellClick } from '@/services/firestore';
+import { recordPremiumExperimentInteraction, recordPremiumUpsellClick } from '@/services/firestore';
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
@@ -31,6 +32,7 @@ export default function DashboardScreen() {
     attachMealPhoto,
     hasPremiumAccess,
     isAdmin,
+    premiumExperimentVariant,
     premiumPrice,
     switchToPaidForAlpha,
     setMealRating,
@@ -47,13 +49,48 @@ export default function DashboardScreen() {
 
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null);
   const [showPremiumPaywall, setShowPremiumPaywall] = useState(false);
+  const [paywallSource, setPaywallSource] = useState('dashboard');
 
   const goToLogMeal = () => router.push('/(tabs)/log-meal');
 
+  const recordPremiumInteraction = useCallback(
+    (action: Parameters<typeof recordPremiumExperimentInteraction>[0]['action'], source: string) => {
+      const variant = premiumExperimentVariant ?? 'no_access';
+      if (user?.uid) {
+        recordPremiumExperimentInteraction({ uid: user.uid, variant, action }).catch(console.error);
+      }
+      trackPremiumExperimentInteraction({
+        action,
+        variant: premiumExperimentVariant ?? 'unknown',
+        source,
+        hasPremiumAccess,
+      });
+    },
+    [hasPremiumAccess, premiumExperimentVariant, user?.uid]
+  );
+
+  const openPremiumPaywall = useCallback(
+    (source: string) => {
+      setPaywallSource(source);
+      setShowPremiumPaywall(true);
+      recordPremiumInteraction('paywall_viewed', source);
+    },
+    [recordPremiumInteraction]
+  );
+
+  const closePremiumPaywall = useCallback(() => {
+    if (showPremiumPaywall) {
+      recordPremiumInteraction('paywall_dismissed', paywallSource);
+    }
+    setShowPremiumPaywall(false);
+  }, [paywallSource, recordPremiumInteraction, showPremiumPaywall]);
+
   const handleAttachPhoto = async (mealId: string) => {
+    recordPremiumInteraction('attach_photo_attempted', 'dashboard_meal_card');
+
     if (!hasPremiumAccess) {
       if (user?.uid) recordPremiumUpsellClick(user.uid).catch(console.error);
-      setShowPremiumPaywall(true);
+      openPremiumPaywall('dashboard_attach_photo');
       return;
     }
 
@@ -71,13 +108,14 @@ export default function DashboardScreen() {
     });
 
     if (!result.canceled && result.assets?.[0]?.uri) {
+      recordPremiumInteraction('attach_photo_selected', 'dashboard_meal_card');
       attachMealPhoto(mealId, result.assets[0].uri);
     }
   };
 
   return (
     <>
-      <Modal visible={showPremiumPaywall} transparent animationType="fade" onRequestClose={() => setShowPremiumPaywall(false)}>
+      <Modal visible={showPremiumPaywall} transparent animationType="fade" onRequestClose={closePremiumPaywall}>
         <View style={styles.paywallOverlay}>
           <ThemedView style={[styles.paywallCard, { backgroundColor: theme.card }]}>
             <ThemedText type="subtitle">Premium Feature</ThemedText>
@@ -86,12 +124,13 @@ export default function DashboardScreen() {
             </ThemedText>
             <View style={styles.paywallActions}>
               <Pressable
-                onPress={() => setShowPremiumPaywall(false)}
+                onPress={closePremiumPaywall}
                 style={[styles.photoAttachButton, { borderColor: theme.cardBorder, backgroundColor: theme.surface }]}>
                 <ThemedText>Not now</ThemedText>
               </Pressable>
               <Pressable
                 onPress={() => {
+                  recordPremiumInteraction('switch_to_paid_alpha_clicked', paywallSource);
                   setShowPremiumPaywall(false);
                   void switchToPaidForAlpha();
                   Alert.alert('Premium Enabled', 'Alpha mode: your account now has paid access.');
@@ -248,7 +287,8 @@ export default function DashboardScreen() {
                     meal={meal}
                     theme={theme}
                     hasPremiumAccess={hasPremiumAccess}
-                    onNeedPremium={() => setShowPremiumPaywall(true)}
+                    onNeedPremium={(action) => openPremiumPaywall(`dashboard_${action}`)}
+                    onPremiumInteraction={(action) => recordPremiumInteraction(action, `dashboard_${action}`)}
                     setMealRating={setMealRating}
                     toggleMealFavorite={toggleMealFavorite}
                   />
@@ -273,7 +313,10 @@ export default function DashboardScreen() {
                   Favorite meals is a premium feature. Save go-to meals and find them quickly.
                 </ThemedText>
                 <Pressable
-                  onPress={() => setShowPremiumPaywall(true)}
+                  onPress={() => {
+                    recordPremiumInteraction('favorites_unlock_clicked', 'dashboard_favorites_section');
+                    openPremiumPaywall('dashboard_favorites_unlock');
+                  }}
                   style={[
                     styles.photoAttachButton,
                     { borderColor: theme.accent, backgroundColor: theme.primaryMuted },

@@ -22,4 +22,7 @@ export type UserAnalytics = {
   totalSessionsCompleted: number;
   activeDates: string[];
   premiumUpsellClicks?: number;
+  premiumAccessExperimentId?: string;
+  premiumAccessVariant?: 'premium_access' | 'no_access';
+  premiumAccessAssignedAt?: string;
 };

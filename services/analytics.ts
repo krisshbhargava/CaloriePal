@@ -1,5 +1,16 @@
 import { getAnalytics, logEvent } from '@react-native-firebase/analytics';
 
+type PremiumExperimentVariant = 'premium_access' | 'no_access' | 'unknown';
+type PremiumExperimentAction =
+  | 'paywall_viewed'
+  | 'paywall_dismissed'
+  | 'switch_to_paid_alpha_clicked'
+  | 'attach_photo_attempted'
+  | 'attach_photo_selected'
+  | 'favorites_unlock_clicked'
+  | 'meal_rating_tapped'
+  | 'favorite_toggled';
+
 export function trackMealLogStarted(inputMethod: 'text' | 'voice'): void {
   logEvent(getAnalytics(), 'meal_log_started', { input_method: inputMethod }).catch(() => {});
 }
@@ -28,4 +39,18 @@ export function trackClarificationNeeded(turnNumber: number): void {
 
 export function trackVoiceModeToggled(enabled: boolean): void {
   logEvent(getAnalytics(), 'voice_mode_toggled', { enabled }).catch(() => {});
+}
+
+export function trackPremiumExperimentInteraction(params: {
+  action: PremiumExperimentAction;
+  variant: PremiumExperimentVariant;
+  source: string;
+  hasPremiumAccess: boolean;
+}): void {
+  logEvent(getAnalytics(), 'premium_experiment_interaction', {
+    action: params.action,
+    variant: params.variant,
+    source: params.source,
+    has_premium_access: params.hasPremiumAccess,
+  }).catch(() => {});
 }

@@ -18,6 +18,25 @@ import { MealEntry } from '@/models/domain';
 import { MacroGoals } from '@/store/app-store';
 import { db } from './firebase';
 
+export type PremiumAccessExperimentVariant = 'premium_access' | 'no_access';
+
+export type PremiumAccessExperimentAssignment = {
+  experimentId: 'premium_access_ab_test';
+  variant: PremiumAccessExperimentVariant;
+  assignedAt: string;
+  updatedAt: string;
+};
+
+export type PremiumExperimentInteractionAction =
+  | 'paywall_viewed'
+  | 'paywall_dismissed'
+  | 'switch_to_paid_alpha_clicked'
+  | 'attach_photo_attempted'
+  | 'attach_photo_selected'
+  | 'favorites_unlock_clicked'
+  | 'meal_rating_tapped'
+  | 'favorite_toggled';
+
 // ── Meals ──────────────────────────────────────────────────────────────────
 
 export async function fetchMeals(uid: string): Promise<MealEntry[]> {
@@ -64,6 +83,59 @@ export async function saveNote(uid: string, dateKey: string, text: string): Prom
   } else {
     await deleteDoc(doc(db, 'users', uid, 'notes', dateKey));
   }
+}
+
+// -- Experiments ----------------------------------------------------------------
+
+function assignPremiumAccessVariant(uid: string): PremiumAccessExperimentVariant {
+  let hash = 0;
+  for (let index = 0; index < uid.length; index += 1) {
+    hash = (hash * 31 + uid.charCodeAt(index)) >>> 0;
+  }
+  return hash % 2 === 0 ? 'premium_access' : 'no_access';
+}
+
+export async function fetchOrAssignPremiumAccessExperiment(
+  uid: string
+): Promise<PremiumAccessExperimentAssignment> {
+  const experimentRef = doc(db, 'users', uid, 'experiments', 'premium_access');
+  const existing = await getDoc(experimentRef);
+
+  if (existing.exists()) {
+    const data = existing.data() as Partial<PremiumAccessExperimentAssignment>;
+    if (
+      data.experimentId === 'premium_access_ab_test' &&
+      (data.variant === 'premium_access' || data.variant === 'no_access') &&
+      typeof data.assignedAt === 'string' &&
+      typeof data.updatedAt === 'string'
+    ) {
+      return data as PremiumAccessExperimentAssignment;
+    }
+  }
+
+  const now = new Date().toISOString();
+  const assignment: PremiumAccessExperimentAssignment = {
+    experimentId: 'premium_access_ab_test',
+    variant: assignPremiumAccessVariant(uid),
+    assignedAt: now,
+    updatedAt: now,
+  };
+
+  await Promise.all([
+    setDoc(experimentRef, assignment),
+    setDoc(
+      doc(db, 'analytics_users', uid),
+      {
+        premiumAccessExperimentId: assignment.experimentId,
+        premiumAccessVariant: assignment.variant,
+        premiumAccessAssignedAt: assignment.assignedAt,
+        lastActive: now,
+      },
+      { merge: true }
+    ),
+  ]);
+
+  return assignment;
 }
 
 // ── Analytics writes ────────────────────────────────────────────────────────
@@ -145,6 +217,40 @@ export async function recordPremiumUpsellClick(uid: string): Promise<void> {
       premiumUpsellClicks: increment(1),
       lastActive: new Date().toISOString(),
     }, { merge: true }),
+  ]);
+}
+
+function buildPremiumExperimentCounterField(
+  variant: PremiumAccessExperimentVariant,
+  action: PremiumExperimentInteractionAction
+): string {
+  return `premiumExperiment_${variant}_${action}`;
+}
+
+export async function recordPremiumExperimentInteraction(params: {
+  uid: string;
+  variant: PremiumAccessExperimentVariant;
+  action: PremiumExperimentInteractionAction;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const counterField = buildPremiumExperimentCounterField(params.variant, params.action);
+
+  await Promise.all([
+    setDoc(
+      doc(db, 'analytics_daily', todayKey()),
+      {
+        [counterField]: increment(1),
+      },
+      { merge: true }
+    ),
+    setDoc(
+      doc(db, 'analytics_users', params.uid),
+      {
+        [counterField]: increment(1),
+        lastActive: now,
+      },
+      { merge: true }
+    ),
   ]);
 }
 

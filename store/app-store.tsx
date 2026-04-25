@@ -13,8 +13,10 @@ import {
 import { useAuth } from '@/context/auth-context';
 import { GroqMessage, interpretMealWithGroq } from '@/services/meal-interpreter';
 import {
+  PremiumAccessExperimentVariant,
   fetchGoals,
   fetchMeals,
+  fetchOrAssignPremiumAccessExperiment,
   fetchNotes,
   recordMealSaved,
   recordSessionAbandoned,
@@ -70,6 +72,7 @@ type AppStateContextValue = {
   macroGoals: MacroGoals;
   isAdmin: boolean;
   hasPremiumAccess: boolean;
+  premiumExperimentVariant: PremiumAccessExperimentVariant | null;
   premiumPrice: string;
   setMacroGoals: (updates: Partial<MacroGoals>) => void;
   switchToPaidForAlpha: () => Promise<void>;
@@ -107,8 +110,12 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const normalizedEmail = user?.email?.trim().toLowerCase() ?? '';
   const isAdmin = normalizedEmail !== '' && ADMIN_EMAILS.includes(normalizedEmail);
   const [alphaPaidEnabled, setAlphaPaidEnabled] = useState(false);
+  const [premiumExperimentVariant, setPremiumExperimentVariant] = useState<PremiumAccessExperimentVariant | null>(null);
   const hasPremiumAccess =
-    isAdmin || alphaPaidEnabled || (normalizedEmail !== '' && PREMIUM_EMAILS.includes(normalizedEmail));
+    isAdmin ||
+    alphaPaidEnabled ||
+    premiumExperimentVariant === 'premium_access' ||
+    (normalizedEmail !== '' && PREMIUM_EMAILS.includes(normalizedEmail));
 
   const [meals, setMeals] = useState<MealEntry[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -134,8 +141,15 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       setMeals([]);
       setDateNotes({});
       setMacroGoalsState(DEFAULT_MACRO_GOALS);
+      setPremiumExperimentVariant(null);
       return;
     }
+    fetchOrAssignPremiumAccessExperiment(uid)
+      .then((assignment) => setPremiumExperimentVariant(assignment.variant))
+      .catch((error) => {
+        console.error(error);
+        setPremiumExperimentVariant(null);
+      });
     fetchMeals(uid).then(setMeals).catch(console.error);
     fetchGoals(uid).then((goals) => { if (goals) setMacroGoalsState(goals); }).catch(console.error);
     fetchNotes(uid).then(setDateNotes).catch(console.error);
@@ -486,6 +500,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       macroGoals,
       isAdmin,
       hasPremiumAccess,
+      premiumExperimentVariant,
       premiumPrice: PREMIUM_MONTHLY_PRICE,
       setMacroGoals,
       switchToPaidForAlpha,
@@ -514,6 +529,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       macroGoals,
       isAdmin,
       hasPremiumAccess,
+      premiumExperimentVariant,
       setMacroGoals,
       switchToPaidForAlpha,
       attachMealPhoto,
