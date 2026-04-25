@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RaisedPressable } from '@/components/raised-pressable';
@@ -20,20 +21,56 @@ function parsePositiveInt(s: string): number | null {
 }
 
 export default function MyMacrosScreen() {
-  const { meals, macroGoals, setMacroGoals } = useAppStore();
+  const { meals, macroGoals, reminderPreferences, setMacroGoals, saveSmsReminderPreferences } = useAppStore();
   const { signOut, user } = useAuth();
   const email = user?.email ?? '';
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
+  const [isUpdatingReminders, setIsUpdatingReminders] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState(reminderPreferences.phoneNumber);
+  const [smsEnabled, setSmsEnabled] = useState(reminderPreferences.enabled);
   const weekly = getWeeklyMacroSummaries(meals);
   const weeklyAverage = Math.round(
     weekly.reduce((sum, day) => sum + day.totals.calories, 0) / Math.max(1, weekly.length)
   );
 
+  useEffect(() => {
+    setPhoneNumber(reminderPreferences.phoneNumber);
+    setSmsEnabled(reminderPreferences.enabled);
+  }, [reminderPreferences.enabled, reminderPreferences.phoneNumber]);
+
   const updateGoal = (key: keyof MacroGoals, text: string) => {
-    const v = parsePositiveInt(text);
-    if (v !== null) setMacroGoals({ [key]: v });
+    const value = parsePositiveInt(text);
+    if (value !== null) setMacroGoals({ [key]: value });
+  };
+
+  const handleSaveReminders = async () => {
+    if (isUpdatingReminders) return;
+
+    setIsUpdatingReminders(true);
+    try {
+      const result = await saveSmsReminderPreferences({
+        enabled: smsEnabled,
+        phoneNumber,
+      });
+      if (!result.ok) {
+        Alert.alert('SMS reminder settings', result.error ?? 'We could not save those settings.');
+        return;
+      }
+
+      Alert.alert(
+        'SMS reminder settings saved',
+        smsEnabled
+          ? 'CaloriePal will text gentle meal-time reminders when your server-side schedule runs.'
+          : 'SMS reminders are off.'
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'We could not save those settings.';
+      Alert.alert('SMS reminder settings', message);
+    } finally {
+      setIsUpdatingReminders(false);
+    }
   };
 
   return (
@@ -58,7 +95,7 @@ export default function MyMacrosScreen() {
             <ThemedText style={styles.goalLabel}>Calories (kcal)</ThemedText>
             <TextInput
               value={String(macroGoals.calories)}
-              onChangeText={(t) => updateGoal('calories', t)}
+              onChangeText={(text) => updateGoal('calories', text)}
               keyboardType="number-pad"
               placeholder="2000"
               placeholderTextColor={theme.tabIconDefault}
@@ -69,7 +106,7 @@ export default function MyMacrosScreen() {
             <ThemedText style={styles.goalLabel}>Protein (g)</ThemedText>
             <TextInput
               value={String(macroGoals.protein)}
-              onChangeText={(t) => updateGoal('protein', t)}
+              onChangeText={(text) => updateGoal('protein', text)}
               keyboardType="number-pad"
               placeholder="150"
               placeholderTextColor={theme.tabIconDefault}
@@ -80,7 +117,7 @@ export default function MyMacrosScreen() {
             <ThemedText style={styles.goalLabel}>Carbs (g)</ThemedText>
             <TextInput
               value={String(macroGoals.carbs)}
-              onChangeText={(t) => updateGoal('carbs', t)}
+              onChangeText={(text) => updateGoal('carbs', text)}
               keyboardType="number-pad"
               placeholder="200"
               placeholderTextColor={theme.tabIconDefault}
@@ -91,13 +128,61 @@ export default function MyMacrosScreen() {
             <ThemedText style={styles.goalLabel}>Fat (g)</ThemedText>
             <TextInput
               value={String(macroGoals.fat)}
-              onChangeText={(t) => updateGoal('fat', t)}
+              onChangeText={(text) => updateGoal('fat', text)}
               keyboardType="number-pad"
               placeholder="65"
               placeholderTextColor={theme.tabIconDefault}
               style={[styles.goalInput, { borderColor: theme.cardBorder, color: theme.text }]}
             />
           </View>
+        </ThemedView>
+
+        <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
+          <View style={styles.reminderHeader}>
+            <View style={styles.reminderCopy}>
+              <ThemedText type="subtitle">SMS meal reminders</ThemedText>
+              <ThemedText style={styles.goalsHint}>
+                Text gentle nudges before common meal times if you still have calories or protein left and have
+                not been active in a while.
+              </ThemedText>
+            </View>
+            <Switch
+              value={smsEnabled}
+              onValueChange={setSmsEnabled}
+              disabled={isUpdatingReminders}
+              trackColor={{ false: theme.surface, true: theme.primaryMuted }}
+              thumbColor={smsEnabled ? theme.primary : '#f4f3f4'}
+            />
+          </View>
+
+          <View style={styles.smsField}>
+            <ThemedText style={styles.smsLabel}>Mobile number</ThemedText>
+            <TextInput
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="phone-pad"
+              placeholder="+15551234567"
+              placeholderTextColor={theme.tabIconDefault}
+              style={[styles.smsInput, { borderColor: theme.cardBorder, color: theme.text }]}
+            />
+          </View>
+
+          <ThemedView style={[styles.reminderNote, { backgroundColor: theme.surface }]}>
+            <ThemedText style={styles.reminderNoteText}>
+              Time zone: {reminderPreferences.timezone}. Use E.164 format for best results, like +15551234567.
+            </ThemedText>
+          </ThemedView>
+
+          <RaisedPressable
+            onPress={() => void handleSaveReminders()}
+            style={[styles.saveReminderButton, { backgroundColor: theme.primary }]}
+            shadowColor={theme.primary}>
+            <ThemedText style={styles.saveReminderText}>
+              {isUpdatingReminders ? 'Saving...' : 'Save SMS reminders'}
+            </ThemedText>
+          </RaisedPressable>
         </ThemedView>
 
         <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
@@ -166,6 +251,51 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: { ...Shadows.card },
+  reminderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reminderCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  smsField: {
+    gap: 8,
+  },
+  smsLabel: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
+  smsInput: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  saveReminderButton: {
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  saveReminderText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  reminderNote: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  reminderNoteText: {
+    fontSize: 14,
+    lineHeight: 20,
+    opacity: 0.85,
+  },
   goalsHint: {
     fontSize: 14,
     opacity: 0.85,

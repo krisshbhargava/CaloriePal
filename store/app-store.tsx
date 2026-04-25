@@ -1,7 +1,9 @@
-import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
+import { AppState, type AppStateStatus } from 'react-native';
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAuth } from '@/context/auth-context';
 import {
   ChatMessage,
   ChatSessionStatus,
@@ -10,26 +12,34 @@ import {
   MealEntry,
   MealInterpretationResponse,
 } from '@/models/domain';
-import { useAuth } from '@/context/auth-context';
-import { GroqMessage, interpretMealWithGroq } from '@/services/meal-interpreter';
 import {
-  fetchGoals,
-  fetchMeals,
-  fetchNotes,
-  recordMealSaved,
-  recordSessionAbandoned,
-  recordSessionCompleted,
-  recordSessionStart,
-  saveMeal,
-  saveGoals,
-  saveNote,
-} from '@/services/firestore';
+  DEFAULT_REMINDER_PREFERENCES,
+  getResolvedTimeZone,
+  isValidE164PhoneNumber,
+  normalizePhoneNumber,
+  type ReminderPreferences,
+} from '@/models/reminders';
 import {
   trackClarificationNeeded,
   trackMealLogAbandoned,
   trackMealLogCompleted,
   trackMealLogStarted,
 } from '@/services/analytics';
+import {
+  fetchGoals,
+  fetchMeals,
+  fetchNotes,
+  fetchReminderPreferences,
+  recordMealSaved,
+  recordSessionAbandoned,
+  recordSessionCompleted,
+  recordSessionStart,
+  saveGoals,
+  saveMeal,
+  saveNote,
+  saveReminderPreferences,
+} from '@/services/firestore';
+import { GroqMessage, interpretMealWithGroq } from '@/services/meal-interpreter';
 
 export type MacroGoals = {
   calories: number;
@@ -47,6 +57,7 @@ const DEFAULT_MACRO_GOALS: MacroGoals = {
 
 const PREMIUM_MONTHLY_PRICE = '$5.99';
 const ALPHA_PAID_KEY = 'alpha_paid_enabled';
+const REMINDER_REMOTE_ACTIVITY_WRITE_MS = 15 * 60 * 1000;
 const ADMIN_EMAILS = (process.env.EXPO_PUBLIC_ADMIN_EMAILS ?? '')
   .split(',')
   .map((value) => value.trim().toLowerCase())
@@ -68,10 +79,12 @@ type AppStateContextValue = {
   editingMealId: string | null;
   dateNotes: Record<string, string>;
   macroGoals: MacroGoals;
+  reminderPreferences: ReminderPreferences;
   isAdmin: boolean;
   hasPremiumAccess: boolean;
   premiumPrice: string;
   setMacroGoals: (updates: Partial<MacroGoals>) => void;
+  saveSmsReminderPreferences: (updates: { enabled: boolean; phoneNumber: string }) => Promise<{ ok: boolean; error?: string }>;
   switchToPaidForAlpha: () => Promise<void>;
   attachMealPhoto: (mealId: string, photoUri: string) => void;
   setMealRating: (mealId: string, rating: number) => void;
@@ -121,6 +134,11 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [dateNotes, setDateNotes] = useState<Record<string, string>>({});
   const [macroGoals, setMacroGoalsState] = useState<MacroGoals>(DEFAULT_MACRO_GOALS);
+  const [reminderPreferences, setReminderPreferencesState] = useState<ReminderPreferences>({
+    ...DEFAULT_REMINDER_PREFERENCES,
+    timezone: getResolvedTimeZone(),
+  });
+  const lastRemoteActivityWriteRef = useRef<string | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(ALPHA_PAID_KEY)
@@ -128,30 +146,119 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       .catch(() => setAlphaPaidEnabled(false));
   }, []);
 
-  // Load all user data from Firestore when the user logs in
   useEffect(() => {
     if (!uid) {
       setMeals([]);
       setDateNotes({});
       setMacroGoalsState(DEFAULT_MACRO_GOALS);
+      setReminderPreferencesState({
+        ...DEFAULT_REMINDER_PREFERENCES,
+        timezone: getResolvedTimeZone(),
+      });
+      lastRemoteActivityWriteRef.current = null;
       return;
     }
+
     fetchMeals(uid).then(setMeals).catch(console.error);
-    fetchGoals(uid).then((goals) => { if (goals) setMacroGoalsState(goals); }).catch(console.error);
+    fetchGoals(uid).then((goals) => {
+      if (goals) setMacroGoalsState(goals);
+    }).catch(console.error);
     fetchNotes(uid).then(setDateNotes).catch(console.error);
+    fetchReminderPreferences(uid)
+      .then((preferences) => {
+        const next = {
+          ...DEFAULT_REMINDER_PREFERENCES,
+          timezone: getResolvedTimeZone(),
+          ...preferences,
+        };
+        setReminderPreferencesState(next);
+        lastRemoteActivityWriteRef.current = next.lastActivityAt;
+      })
+      .catch(console.error);
   }, [uid]);
+
+  const recordUserActivity = useCallback(
+    async (at = new Date(), options?: { forceRemote?: boolean }) => {
+      if (!uid) return;
+
+      const iso = at.toISOString();
+      const timezone = getResolvedTimeZone();
+
+      setReminderPreferencesState((prev) => ({
+        ...prev,
+        timezone,
+        lastActivityAt: iso,
+      }));
+
+      const lastWriteMs = lastRemoteActivityWriteRef.current ? Date.parse(lastRemoteActivityWriteRef.current) : Number.NaN;
+      const shouldWriteRemote =
+        options?.forceRemote ||
+        !Number.isFinite(lastWriteMs) ||
+        at.getTime() - lastWriteMs >= REMINDER_REMOTE_ACTIVITY_WRITE_MS;
+
+      if (!shouldWriteRemote) return;
+
+      lastRemoteActivityWriteRef.current = iso;
+      await saveReminderPreferences(uid, {
+        timezone,
+        lastActivityAt: iso,
+      });
+    },
+    [uid]
+  );
+
+  useEffect(() => {
+    if (!uid) return;
+
+    recordUserActivity(new Date(), { forceRemote: true }).catch(console.error);
+
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (previousState !== 'active' && nextState === 'active') {
+        recordUserActivity(new Date(), { forceRemote: true }).catch(console.error);
+      }
+      previousState = nextState;
+    });
+
+    return () => subscription.remove();
+  }, [recordUserActivity, uid]);
 
   const setMacroGoals = useCallback((updates: Partial<MacroGoals>) => {
     setMacroGoalsState((prev) => {
       const next = { ...prev };
       (Object.keys(updates) as (keyof MacroGoals)[]).forEach((key) => {
-        const v = updates[key];
-        if (typeof v === 'number' && v >= 0) next[key] = Math.round(v);
+        const value = updates[key];
+        if (typeof value === 'number' && value >= 0) next[key] = Math.round(value);
       });
       if (uid) saveGoals(uid, next).catch(console.error);
       return next;
     });
   }, [uid]);
+
+  const saveSmsReminderPreferences = useCallback(
+    async (updates: { enabled: boolean; phoneNumber: string }) => {
+      if (!uid) {
+        return { ok: false, error: 'You need to be signed in to save reminder settings.' };
+      }
+
+      const phoneNumber = normalizePhoneNumber(updates.phoneNumber);
+      if (updates.enabled && !isValidE164PhoneNumber(phoneNumber)) {
+        return { ok: false, error: 'Enter a valid mobile number, like +15551234567.' };
+      }
+
+      const next: ReminderPreferences = {
+        ...reminderPreferences,
+        enabled: updates.enabled,
+        phoneNumber,
+        timezone: getResolvedTimeZone(),
+      };
+
+      setReminderPreferencesState(next);
+      await saveReminderPreferences(uid, next);
+      return { ok: true };
+    },
+    [reminderPreferences, uid]
+  );
 
   const switchToPaidForAlpha = useCallback(async () => {
     setAlphaPaidEnabled(true);
@@ -183,7 +290,6 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       const trimmed = text.trim();
       if (!trimmed || isInterpreting) return;
 
-      // Track session start on first message
       if (sessionHistoryRef.current.length === 0) {
         sessionStartTimeRef.current = Date.now();
         sessionInputMethodRef.current = inputMethod;
@@ -197,6 +303,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       appendChatMessage({ role: 'user', text: trimmed, type: 'message' });
       sessionHistoryRef.current = [...sessionHistoryRef.current, { role: 'user', content: trimmed }];
+      recordUserActivity().catch(console.error);
 
       try {
         const response = await interpretMealWithGroq(sessionHistoryRef.current);
@@ -205,10 +312,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         if (response.status === 'clarification_needed') {
           const question = response.clarificationQuestion ?? 'Can you tell me more?';
           appendChatMessage({ role: 'assistant', text: question, type: 'clarification' });
-          sessionHistoryRef.current = [
-            ...sessionHistoryRef.current,
-            { role: 'assistant', content: question },
-          ];
+          sessionHistoryRef.current = [...sessionHistoryRef.current, { role: 'assistant', content: question }];
           clarificationTurnsRef.current += 1;
           trackClarificationNeeded(clarificationTurnsRef.current);
           setActiveDraft(null);
@@ -226,10 +330,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
               : '';
           const summary = `Got it! Here's my estimate for **${response.mealTitle}**:\n${macros.calories} kcal · ${macros.protein}g protein · ${macros.carbs}g carbs · ${macros.fat}g fat${componentLines}\n\nDoes that look right?`;
           appendChatMessage({ role: 'assistant', text: summary, type: 'confirmation' });
-          sessionHistoryRef.current = [
-            ...sessionHistoryRef.current,
-            { role: 'assistant', content: summary },
-          ];
+          sessionHistoryRef.current = [...sessionHistoryRef.current, { role: 'assistant', content: summary }];
           setActiveDraft({
             sourceText: trimmed,
             mealTitle: response.mealTitle!,
@@ -248,7 +349,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         setIsInterpreting(false);
       }
     },
-    [appendChatMessage, isInterpreting]
+    [appendChatMessage, isInterpreting, recordUserActivity, uid, user?.email]
   );
 
   const saveMealFromInterpretation = useCallback(
@@ -268,7 +369,6 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       setChatStatus('saving');
 
       const existingMeal = editingMealId ? meals.find((candidate) => candidate.id === editingMealId) : null;
-
       const meal: MealEntry = {
         id: editingMealId ?? buildId('meal'),
         title: activeDraft.mealTitle,
@@ -286,13 +386,13 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       };
 
       if (editingMealId) {
-        // Replace the existing meal
-        setMeals((prev) => prev.map((m) => (m.id === editingMealId ? meal : m)));
+        setMeals((prev) => prev.map((candidate) => (candidate.id === editingMealId ? meal : candidate)));
       } else {
         setMeals((prev) => [meal, ...prev]);
       }
 
       if (uid) saveMeal(uid, meal).catch(console.error);
+      recordUserActivity().catch(console.error);
 
       const durationSeconds = sessionStartTimeRef.current
         ? Math.round((Date.now() - sessionStartTimeRef.current) / 1000)
@@ -327,7 +427,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       return meal;
     },
-    [activeDraft, pendingInterpretation, editingMealId, meals, uid]
+    [activeDraft, editingMealId, meals, pendingInterpretation, recordUserActivity, uid]
   );
 
   const attachMealPhoto = useCallback(
@@ -336,14 +436,13 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         const next = prev.map((meal) => (meal.id === mealId ? { ...meal, photoUri } : meal));
         if (uid) {
           const updated = next.find((meal) => meal.id === mealId);
-          if (updated) {
-            saveMeal(uid, updated).catch(console.error);
-          }
+          if (updated) saveMeal(uid, updated).catch(console.error);
         }
         return next;
       });
+      recordUserActivity().catch(console.error);
     },
-    [uid]
+    [recordUserActivity, uid]
   );
 
   const setMealRating = useCallback(
@@ -357,8 +456,9 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         }
         return next;
       });
+      recordUserActivity().catch(console.error);
     },
-    [uid]
+    [recordUserActivity, uid]
   );
 
   const toggleMealFavorite = useCallback(
@@ -373,73 +473,69 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         }
         return next;
       });
+      recordUserActivity().catch(console.error);
     },
-    [uid]
+    [recordUserActivity, uid]
   );
 
   const editMeal = useCallback(
     (id: string, updates: { title?: string; calories: number; protein: number; carbs: number; fat: number }) => {
       setMeals((prev) => {
-        const next = prev.map((m) =>
-          m.id === id
+        const next = prev.map((meal) =>
+          meal.id === id
             ? {
-                ...m,
+                ...meal,
                 ...updates,
-                components: scaleMealComponents(m.components, m, updates),
+                components: scaleMealComponents(meal.components, meal, updates),
               }
-            : m
+            : meal
         );
         if (uid) {
-          const updated = next.find((m) => m.id === id);
+          const updated = next.find((meal) => meal.id === id);
           if (updated) saveMeal(uid, updated).catch(console.error);
         }
         return next;
       });
+      recordUserActivity().catch(console.error);
     },
-    [uid]
+    [recordUserActivity, uid]
   );
 
-  const startEditSession = useCallback(
-    (meal: MealEntry) => {
-      // Reset chat state
-      setPendingInterpretation(null);
-      setActiveDraft(null);
-      setChatError(null);
-      setChatStatus('awaiting_input');
-      setIsInterpreting(false);
-      setEditingMealId(meal.id);
+  const startEditSession = useCallback((meal: MealEntry) => {
+    setPendingInterpretation(null);
+    setActiveDraft(null);
+    setChatError(null);
+    setChatStatus('awaiting_input');
+    setIsInterpreting(false);
+    setEditingMealId(meal.id);
 
-      const breakdownContext =
-        meal.components.length > 0
-          ? ` Breakdown: ${meal.components
-              .map(
-                (component) =>
-                  `${component.quantity ? `${component.quantity} ` : ''}${component.name} (${component.calories} kcal, ${component.protein}g protein, ${component.carbs}g carbs, ${component.fat}g fat)`
-              )
-              .join('; ')}.`
-          : '';
-      const contextMessage = `I want to edit a meal I previously logged: "${meal.title}" - ${meal.calories} kcal, ${meal.protein}g protein, ${meal.carbs}g carbs, ${meal.fat}g fat.${breakdownContext}`;
-      const assistantGreeting = `Sure! I have your **${meal.title}** logged at ${meal.calories} kcal. What would you like to change?`;
+    const breakdownContext =
+      meal.components.length > 0
+        ? ` Breakdown: ${meal.components
+            .map(
+              (component) =>
+                `${component.quantity ? `${component.quantity} ` : ''}${component.name} (${component.calories} kcal, ${component.protein}g protein, ${component.carbs}g carbs, ${component.fat}g fat)`
+            )
+            .join('; ')}.`
+        : '';
+    const contextMessage = `I want to edit a meal I previously logged: "${meal.title}" - ${meal.calories} kcal, ${meal.protein}g protein, ${meal.carbs}g carbs, ${meal.fat}g fat.${breakdownContext}`;
+    const assistantGreeting = `Sure! I have your **${meal.title}** logged at ${meal.calories} kcal. What would you like to change?`;
 
-      // Prime the session history with context
-      sessionHistoryRef.current = [
-        { role: 'user', content: contextMessage },
-        { role: 'assistant', content: assistantGreeting },
-      ];
+    sessionHistoryRef.current = [
+      { role: 'user', content: contextMessage },
+      { role: 'assistant', content: assistantGreeting },
+    ];
 
-      setChatMessages([
-        makeChatMessage({ role: 'user', text: contextMessage, type: 'message' }),
-        makeChatMessage({ role: 'assistant', text: assistantGreeting, type: 'message' }),
-      ]);
+    setChatMessages([
+      makeChatMessage({ role: 'user', text: contextMessage, type: 'message' }),
+      makeChatMessage({ role: 'assistant', text: assistantGreeting, type: 'message' }),
+    ]);
 
-      router.push('/(tabs)/log-meal');
-    },
-    []
-  );
+    router.push('/(tabs)/log-meal');
+  }, []);
 
   const clearLastSavedMeal = useCallback(() => {
     setLastSavedMeal(null);
-    // Also reset the chat so it's ready for the next meal
     setPendingInterpretation(null);
     setActiveDraft(null);
     setChatError(null);
@@ -480,10 +576,12 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       editingMealId,
       dateNotes,
       macroGoals,
+      reminderPreferences,
       isAdmin,
       hasPremiumAccess,
       premiumPrice: PREMIUM_MONTHLY_PRICE,
       setMacroGoals,
+      saveSmsReminderPreferences,
       switchToPaidForAlpha,
       attachMealPhoto,
       setMealRating,
@@ -508,9 +606,11 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       editingMealId,
       dateNotes,
       macroGoals,
+      reminderPreferences,
       isAdmin,
       hasPremiumAccess,
       setMacroGoals,
+      saveSmsReminderPreferences,
       switchToPaidForAlpha,
       attachMealPhoto,
       setMealRating,

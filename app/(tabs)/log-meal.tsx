@@ -34,6 +34,7 @@ import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
 const LISTENING_CUE = require('../../assets/Sfx/Blip6.wav');
+const IS_WEB = Platform.OS === 'web';
 
 function MicPulseRings({ active, color }: { active: boolean; color: string }) {
   const ring1 = useRef(new Animated.Value(0)).current;
@@ -198,9 +199,10 @@ export default function LogMealScreen() {
       try {
         ExpoSpeechRecognitionModule.start({
           lang: 'en-US',
-          interimResults: true,
+          interimResults: !IS_WEB,
           continuous: false,
           addsPunctuation: true,
+          maxAlternatives: IS_WEB ? 3 : 1,
         });
       } catch (error) {
         const message =
@@ -314,7 +316,7 @@ export default function LogMealScreen() {
   }, [clearRestartTimeout, clearSpeechEndTimeout]);
 
   useEffect(() => {
-    if (!voiceModeEnabled) {
+      if (!voiceModeEnabled) {
       lastClarificationIdRef.current = '';
       activeDraftSignatureRef.current = '';
       return;
@@ -336,8 +338,14 @@ export default function LogMealScreen() {
       }
 
       lastClarificationIdRef.current = latestAssistantMessage.id;
-      startListening('Listening for your answer...');
-      speakText(buildClarificationPrompt(latestAssistantMessage.text));
+      if (IS_WEB) {
+        speakText(buildClarificationPrompt(latestAssistantMessage.text), () =>
+          startListening('Listening for your answer...')
+        );
+      } else {
+        startListening('Listening for your answer...');
+        speakText(buildClarificationPrompt(latestAssistantMessage.text));
+      }
       return;
     }
 
@@ -355,8 +363,14 @@ export default function LogMealScreen() {
       }
 
       activeDraftSignatureRef.current = signature;
-      startListening('Listening for save or changes...');
-      speakText(buildConfirmationPrompt(activeDraft));
+      if (IS_WEB) {
+        speakText(buildConfirmationPrompt(activeDraft, true), () =>
+          startListening('Listening for save or changes...')
+        );
+      } else {
+        startListening('Listening for save or changes...');
+        speakText(buildConfirmationPrompt(activeDraft, false));
+      }
       return;
     }
   }, [
@@ -392,7 +406,7 @@ export default function LogMealScreen() {
     const transcript = event.results[0]?.transcript?.trim();
     if (!transcript) return;
 
-    if (isSpeakingRef.current) {
+    if (!IS_WEB && isSpeakingRef.current) {
       Speech.stop().catch(() => undefined);
     }
 
@@ -552,15 +566,25 @@ export default function LogMealScreen() {
         if (meal) {
           activeDraftSignatureRef.current = '';
           lastClarificationIdRef.current = '';
-          startListening('Listening for your next meal...');
-          speakText(`Saved ${meal.title}.`);
+          if (IS_WEB) {
+            speakText(`Saved ${meal.title}.`, () =>
+              startListening('Listening for your next meal...')
+            );
+          } else {
+            startListening('Listening for your next meal...');
+            speakText(`Saved ${meal.title}.`);
+          }
         }
         return;
       }
 
       if (command === 'retry') {
-        startListening('Listening for your correction...');
-        speakText('Okay.');
+        if (IS_WEB) {
+          speakText('Okay.', () => startListening('Listening for your correction...'));
+        } else {
+          startListening('Listening for your correction...');
+          speakText('Okay.');
+        }
         return;
       }
     }
@@ -824,9 +848,9 @@ function buildClarificationPrompt(question: string) {
   return question;
 }
 
-function buildConfirmationPrompt(activeDraft: MealDraft) {
+function buildConfirmationPrompt(activeDraft: MealDraft, isWeb: boolean) {
   const macros = activeDraft.estimatedMacros;
-  return `I estimate ${activeDraft.mealTitle} at about ${macros.calories} calories, ${macros.protein} grams of protein, ${macros.carbs} grams of carbs, and ${macros.fat} grams of fat. Say save to log it, or tell me what to change.`;
+  return `I estimate ${activeDraft.mealTitle} at about ${macros.calories} calories, ${macros.protein} grams of protein, ${macros.carbs} grams of carbs, and ${macros.fat} grams of fat. ${isWeb ? 'Say save meal to log it, or say change meal.' : 'Say save to log it, or tell me what to change.'}`;
 }
 
 function getVoiceConfirmationCommand(transcript: string): 'save' | 'retry' | 'message' {
@@ -835,14 +859,14 @@ function getVoiceConfirmationCommand(transcript: string): 'save' | 'retry' | 'me
   const shortReply = compact.split(/\s+/).filter(Boolean).length <= 4;
 
   if (
-    /\b(save|safe|saved|yes|yep|yeah|correct|looks right|that'?s right|log it|sounds good)\b/.test(compact)
+    /\b(save|safe|saved|save meal|log meal|log it|yes|yep|yeah|correct|looks right|that'?s right|sounds good)\b/.test(compact)
   ) {
     return 'save';
   }
 
   if (
     shortReply &&
-    /\b(no|nope|wrong|change|edit|not quite|try again|fix it)\b/.test(compact)
+    /\b(no|nope|wrong|change|change meal|edit|not quite|try again|fix it)\b/.test(compact)
   ) {
     return 'retry';
   }

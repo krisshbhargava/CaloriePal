@@ -13,9 +13,10 @@ import {
   where,
 } from 'firebase/firestore';
 
-import { DailyAnalytics, UserAnalytics } from '@/models/analytics';
-import { MealEntry } from '@/models/domain';
-import { MacroGoals } from '@/store/app-store';
+import type { DailyAnalytics, UserAnalytics } from '@/models/analytics';
+import type { MealEntry } from '@/models/domain';
+import type { ReminderPreferences } from '@/models/reminders';
+import type { MacroGoals } from '@/store/app-store';
 import { db } from './firebase';
 
 // ── Meals ──────────────────────────────────────────────────────────────────
@@ -44,6 +45,16 @@ export async function fetchGoals(uid: string): Promise<MacroGoals | null> {
 
 export async function saveGoals(uid: string, goals: MacroGoals): Promise<void> {
   await setDoc(doc(db, 'users', uid, 'goals', 'default'), goals);
+}
+
+export async function fetchReminderPreferences(uid: string): Promise<ReminderPreferences | null> {
+  const snap = await getDoc(doc(db, 'users', uid, 'settings', 'reminders'));
+  if (!snap.exists()) return null;
+  return snap.data() as ReminderPreferences;
+}
+
+export async function saveReminderPreferences(uid: string, preferences: Partial<ReminderPreferences>): Promise<void> {
+  await setDoc(doc(db, 'users', uid, 'settings', 'reminders'), preferences, { merge: true });
 }
 
 // ── Notes ──────────────────────────────────────────────────────────────────
