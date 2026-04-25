@@ -421,6 +421,10 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       const contextMessage = `I want to edit a meal I previously logged: "${meal.title}" - ${meal.calories} kcal, ${meal.protein}g protein, ${meal.carbs}g carbs, ${meal.fat}g fat.${breakdownContext}`;
       const assistantGreeting = `Sure! I have your **${meal.title}** logged at ${meal.calories} kcal. What would you like to change?`;
 
+      sessionStartTimeRef.current = Date.now();
+      sessionInputMethodRef.current = 'text';
+      if (uid) recordSessionStart(uid, 'text', user?.email ?? undefined).catch(console.error);
+
       // Prime the session history with context
       sessionHistoryRef.current = [
         { role: 'user', content: contextMessage },
@@ -434,7 +438,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
 
       router.push('/(tabs)/log-meal');
     },
-    []
+    [uid, user?.email]
   );
 
   const clearLastSavedMeal = useCallback(() => {
