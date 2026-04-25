@@ -38,6 +38,7 @@ export default function DashboardScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const summary = getDailyMacroSummary(meals, new Date());
   const todaysMeals = meals.filter((meal) => meal.timestamp.slice(0, 10) === summary.dateKey);
+  const favoriteMeals = meals.filter((meal) => meal.isFavorite);
   const theme = Colors[colorScheme];
   const hasNoMeals = meals.length === 0;
 
@@ -251,6 +252,66 @@ export default function DashboardScreen() {
               ))
             )}
           </ThemedView>
+
+          <ThemedView style={[styles.section, styles.card, { backgroundColor: theme.card }]}>
+            <View style={styles.sectionHeaderRow}>
+              <ThemedText type="subtitle">Favorite Meals</ThemedText>
+              {hasPremiumAccess && (
+                <ThemedText style={[styles.premiumBadge, { color: theme.accent, borderColor: theme.accent }]}>
+                  PREMIUM
+                </ThemedText>
+              )}
+            </View>
+
+            {!hasPremiumAccess ? (
+              <ThemedView style={[styles.emptyState, { backgroundColor: theme.surface }]}>
+                <ThemedText>
+                  Favorite meals is a premium feature. Save go-to meals and find them quickly.
+                </ThemedText>
+                <Pressable
+                  onPress={() => setShowPremiumPaywall(true)}
+                  style={[
+                    styles.photoAttachButton,
+                    { borderColor: theme.accent, backgroundColor: theme.primaryMuted },
+                  ]}>
+                  <ThemedText style={{ color: theme.accent }}>Unlock favorites</ThemedText>
+                </Pressable>
+              </ThemedView>
+            ) : favoriteMeals.length === 0 ? (
+              <ThemedView style={[styles.emptyState, { backgroundColor: theme.surface }]}>
+                <ThemedText>
+                  No favorites yet. Tap the heart on a meal card to add it here.
+                </ThemedText>
+              </ThemedView>
+            ) : (
+              favoriteMeals.slice(0, 8).map((meal) => (
+                <ThemedView
+                  key={`favorite-${meal.id}`}
+                  style={[styles.favoriteCard, { backgroundColor: theme.surface, borderLeftColor: theme.primary }]}>
+                  <ThemedText type="defaultSemiBold" numberOfLines={1}>
+                    {meal.title}
+                  </ThemedText>
+                  <ThemedText style={styles.mealMacros}>
+                    {meal.calories} kcal · P {meal.protein}g · C {meal.carbs}g · F {meal.fat}g
+                  </ThemedText>
+                  {!!meal.photoUri && (
+                    <Image source={{ uri: meal.photoUri }} style={styles.favoriteThumb} contentFit="cover" />
+                  )}
+                  <Pressable
+                    onPress={() => setEditingMeal(meal)}
+                    style={[
+                      styles.photoAttachButton,
+                      {
+                        borderColor: theme.accent,
+                        backgroundColor: theme.primaryMuted,
+                      },
+                    ]}>
+                    <ThemedText style={{ color: theme.accent }}>Open meal</ThemedText>
+                  </Pressable>
+                </ThemedView>
+              ))
+            )}
+          </ThemedView>
         </View>
       </ScrollView>
     </>
@@ -384,6 +445,18 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 4,
     borderLeftWidth: 4,
+  },
+  favoriteCard: {
+    borderRadius: 16,
+    padding: 12,
+    gap: 6,
+    borderLeftWidth: 4,
+  },
+  favoriteThumb: {
+    width: '100%',
+    height: 120,
+    borderRadius: 10,
+    marginTop: 4,
   },
   mealTitle: {
     fontWeight: '600' as const,
