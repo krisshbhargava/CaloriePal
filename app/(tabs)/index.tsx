@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,25 @@ import { recordPremiumExperimentInteraction, recordPremiumUpsellClick } from '@/
 import { useAppStore } from '@/store/app-store';
 
 const TOP_INSET_EXTRA = 12;
+
+async function pickWebImageUri(): Promise<string | null> {
+  if (typeof document === 'undefined') return null;
+
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      resolve(URL.createObjectURL(file));
+    };
+    input.click();
+  });
+}
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -93,22 +112,37 @@ export default function DashboardScreen() {
       return;
     }
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission Needed', 'Please allow photo library access to attach meal photos.');
-      return;
+    let pickedUri: string | null = null;
+
+    if (Platform.OS === 'web') {
+      pickedUri = await pickWebImageUri();
+    } else {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Needed', 'Please allow photo library access to attach meal photos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        aspect: [4, 3],
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        pickedUri = result.assets[0].uri;
+      }
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-      aspect: [4, 3],
-    });
+    if (!pickedUri) return;
 
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      recordPremiumInteraction('attach_photo_selected', 'dashboard_meal_card');
-      attachMealPhoto(mealId, result.assets[0].uri);
+    recordPremiumInteraction('attach_photo_selected', 'dashboard_meal_card');
+    try {
+      await attachMealPhoto(mealId, pickedUri);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Upload failed', 'Could not upload the image. Please try again.');
     }
   };
 
