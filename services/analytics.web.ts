@@ -52,3 +52,25 @@ export function trackClarificationNeeded(turnNumber: number): void {
 export function trackVoiceModeToggled(enabled: boolean): void {
   fireEvent('voice_mode_toggled', { enabled });
 }
+
+export function trackPremiumExperimentInteraction(params: {
+  action:
+    | 'paywall_viewed'
+    | 'paywall_dismissed'
+    | 'switch_to_paid_alpha_clicked'
+    | 'attach_photo_attempted'
+    | 'attach_photo_selected'
+    | 'favorites_unlock_clicked'
+    | 'meal_rating_tapped'
+    | 'favorite_toggled';
+  variant: 'premium_access' | 'no_access' | 'unknown';
+  source: string;
+  hasPremiumAccess: boolean;
+}): void {
+  fireEvent('premium_experiment_interaction', {
+    action: params.action,
+    variant: params.variant,
+    source: params.source,
+    has_premium_access: params.hasPremiumAccess,
+  });
+}

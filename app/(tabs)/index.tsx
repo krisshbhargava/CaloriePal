@@ -74,16 +74,20 @@ export default function DashboardScreen() {
 
   const recordPremiumInteraction = useCallback(
     (action: Parameters<typeof recordPremiumExperimentInteraction>[0]['action'], source: string) => {
-      const variant = premiumExperimentVariant ?? 'no_access';
-      if (user?.uid) {
-        recordPremiumExperimentInteraction({ uid: user.uid, variant, action }).catch(console.error);
+      try {
+        const variant = premiumExperimentVariant ?? 'no_access';
+        if (user?.uid) {
+          recordPremiumExperimentInteraction({ uid: user.uid, variant, action }).catch(console.error);
+        }
+        trackPremiumExperimentInteraction({
+          action,
+          variant: premiumExperimentVariant ?? 'unknown',
+          source,
+          hasPremiumAccess,
+        });
+      } catch (error) {
+        console.error('premium_interaction_track_failed', error);
       }
-      trackPremiumExperimentInteraction({
-        action,
-        variant: premiumExperimentVariant ?? 'unknown',
-        source,
-        hasPremiumAccess,
-      });
     },
     [hasPremiumAccess, premiumExperimentVariant, user?.uid]
   );
