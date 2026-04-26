@@ -52,6 +52,7 @@ export default function DashboardScreen() {
     hasPremiumAccess,
     premiumExperimentVariant,
     premiumPrice,
+    switchToPaidForAlpha,
 
     setMealRating,
     toggleMealFavorite,
@@ -164,10 +165,12 @@ export default function DashboardScreen() {
               <Pressable
                 onPress={() => {
                   recordPremiumInteraction('switch_to_paid_alpha_clicked', paywallSource);
+                  void switchToPaidForAlpha();
                   setShowPremiumPaywall(false);
+                  Alert.alert('Premium Enabled', 'Alpha mode enabled for this account on this device.');
                 }}
-                style={[styles.photoAttachButton, { borderColor: theme.cardBorder, backgroundColor: theme.surface, opacity: 0.45 }]}>
-                <ThemedText>Upgrade (coming soon)</ThemedText>
+                style={[styles.photoAttachButton, { borderColor: theme.accent, backgroundColor: theme.primaryMuted }]}>
+                <ThemedText style={{ color: theme.accent }}>Switch to paid (alpha)</ThemedText>
               </Pressable>
             </View>
           </ThemedView>
