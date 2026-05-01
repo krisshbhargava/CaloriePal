@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from '@/context/auth-context';
 import { RemoteConfigProvider } from '@/context/remote-config-context';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { AppStoreProvider } from '@/store/app-store';
+import { AppStoreProvider, useAppStore } from '@/store/app-store';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,18 +21,24 @@ export const unstable_settings = {
 
 function RootNavigator() {
   const { user, isLoading } = useAuth();
+  const { isProfileLoaded, hasCompletedOnboarding } = useAppStore();
   const colorScheme = useColorScheme();
 
   useEffect(() => {
     if (isLoading) return;
     if (!user) {
       router.replace('/auth/login' as any);
+      return;
+    }
+    if (!isProfileLoaded) return;
+    if (!hasCompletedOnboarding) {
+      router.replace('/onboarding' as any);
     } else {
       router.replace('/(tabs)');
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, isProfileLoaded, hasCompletedOnboarding]);
 
-  if (isLoading) {
+  if (isLoading || (user && !isProfileLoaded)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={Colors.light.primary} />
@@ -46,6 +52,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
         <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />

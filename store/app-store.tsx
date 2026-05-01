@@ -18,6 +18,7 @@ import {
   fetchMeals,
   fetchOrAssignPremiumAccessExperiment,
   fetchNotes,
+  fetchUserProfile,
   recordMealSaved,
   recordSessionAbandoned,
   recordSessionCompleted,
@@ -25,7 +26,9 @@ import {
   saveMeal,
   saveGoals,
   saveNote,
+  saveUserProfile,
 } from '@/services/firestore';
+import { UserProfile } from '@/models/onboarding';
 import {
   trackClarificationNeeded,
   trackMealLogAbandoned,
@@ -70,11 +73,15 @@ type AppStateContextValue = {
   editingMealId: string | null;
   dateNotes: Record<string, string>;
   macroGoals: MacroGoals;
+  userProfile: UserProfile | null;
+  isProfileLoaded: boolean;
+  hasCompletedOnboarding: boolean;
   isAdmin: boolean;
   hasPremiumAccess: boolean;
   premiumExperimentVariant: PremiumAccessExperimentVariant | null;
   premiumPrice: string;
   setMacroGoals: (updates: Partial<MacroGoals>) => void;
+  completeOnboarding: (profile: Omit<UserProfile, 'onboardingCompleted' | 'completedAt'>, goals: MacroGoals) => Promise<void>;
   switchToPaidForAlpha: () => Promise<void>;
   attachMealPhoto: (mealId: string, photoUri: string) => void;
   setMealRating: (mealId: string, rating: number) => void;
@@ -128,6 +135,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [dateNotes, setDateNotes] = useState<Record<string, string>>({});
   const [macroGoals, setMacroGoalsState] = useState<MacroGoals>(DEFAULT_MACRO_GOALS);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(ALPHA_PAID_KEY)
@@ -141,6 +150,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       setMeals([]);
       setDateNotes({});
       setMacroGoalsState(DEFAULT_MACRO_GOALS);
+      setUserProfile(null);
+      setIsProfileLoaded(false);
       setPremiumExperimentVariant(null);
       return;
     }
@@ -153,7 +164,34 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     fetchMeals(uid).then(setMeals).catch(console.error);
     fetchGoals(uid).then((goals) => { if (goals) setMacroGoalsState(goals); }).catch(console.error);
     fetchNotes(uid).then(setDateNotes).catch(console.error);
+    setIsProfileLoaded(false);
+    fetchUserProfile(uid)
+      .then((profile) => setUserProfile(profile))
+      .catch((error) => {
+        console.error(error);
+        setUserProfile(null);
+      })
+      .finally(() => setIsProfileLoaded(true));
   }, [uid]);
+
+  const completeOnboarding = useCallback(
+    async (
+      profile: Omit<UserProfile, 'onboardingCompleted' | 'completedAt'>,
+      goals: MacroGoals
+    ) => {
+      const fullProfile: UserProfile = {
+        ...profile,
+        onboardingCompleted: true,
+        completedAt: new Date().toISOString(),
+      };
+      setUserProfile(fullProfile);
+      setMacroGoalsState(goals);
+      if (uid) {
+        await Promise.all([saveUserProfile(uid, fullProfile), saveGoals(uid, goals)]);
+      }
+    },
+    [uid]
+  );
 
   const setMacroGoals = useCallback((updates: Partial<MacroGoals>) => {
     setMacroGoalsState((prev) => {
@@ -498,11 +536,15 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       editingMealId,
       dateNotes,
       macroGoals,
+      userProfile,
+      isProfileLoaded,
+      hasCompletedOnboarding: Boolean(userProfile?.onboardingCompleted),
       isAdmin,
       hasPremiumAccess,
       premiumExperimentVariant,
       premiumPrice: PREMIUM_MONTHLY_PRICE,
       setMacroGoals,
+      completeOnboarding,
       switchToPaidForAlpha,
       attachMealPhoto,
       setMealRating,
@@ -527,10 +569,13 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       editingMealId,
       dateNotes,
       macroGoals,
+      userProfile,
+      isProfileLoaded,
       isAdmin,
       hasPremiumAccess,
       premiumExperimentVariant,
       setMacroGoals,
+      completeOnboarding,
       switchToPaidForAlpha,
       attachMealPhoto,
       setMealRating,

@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 
 import { MealEntry } from '@/models/domain';
+import { UserProfile } from '@/models/onboarding';
 import { MacroGoals } from '@/store/app-store';
 import { db } from './firebase';
 
@@ -60,6 +61,18 @@ export async function fetchGoals(uid: string): Promise<MacroGoals | null> {
 
 export async function saveGoals(uid: string, goals: MacroGoals): Promise<void> {
   await setDoc(doc(db, 'users', uid, 'goals', 'default'), goals);
+}
+
+// ── Profile ────────────────────────────────────────────────────────────────
+
+export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, 'users', uid, 'profile', 'main'));
+  if (!snap.exists()) return null;
+  return snap.data() as UserProfile;
+}
+
+export async function saveUserProfile(uid: string, profile: UserProfile): Promise<void> {
+  await setDoc(doc(db, 'users', uid, 'profile', 'main'), profile);
 }
 
 // ── Notes ──────────────────────────────────────────────────────────────────
